@@ -4,6 +4,7 @@ import random
 import logging
 import requests
 from typing import List, Dict, Any, Tuple
+from django.conf import settings
 
 from api.exceptions import HubspotAPIError
 
@@ -21,11 +22,19 @@ class HubspotAPIService:
         self.max_retries = int(os.environ.get("HUBSPOT_DEALS_API_MAX_RETRIES", max_retries))
 
     def _uses_mock_mode(self) -> bool:
-        return (
+        # Explicit test token is allowed in testing environments
+        if self.access_token and self.access_token.startswith("test_"):
+            return True
+
+        is_placeholder_or_empty = (
             not self.access_token
-            or self.access_token.startswith("test_")
             or self.access_token == "your-token-here"
         )
+        if is_placeholder_or_empty:
+            if not getattr(settings, 'DEBUG', False):
+                raise HubspotAPIError("Invalid or missing HubSpot API access token in production environment.")
+            return True
+        return False
 
     def fetch_deals_page(self, properties: List[str] = None, limit: int = 10, after_cursor: str = None, include_archived: bool = False) -> Tuple[List[Dict[str, Any]], str, bool]:
         """Fetch a single page of deal records using HubSpot cursor-based pagination."""

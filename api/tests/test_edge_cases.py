@@ -41,4 +41,21 @@ class EdgeCaseTests(TestCase):
             '/api/v1/scan/start', data=payload, content_type='application/json', **AUTH_HEADERS
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        
+
+    def test_invalid_pagination_string_param(self):
+        """Passing non-integer string in pagination params returns 400 Bad Request."""
+        response = self.client.get('/api/v1/jobs/jobs?limit=invalid_string', **AUTH_HEADERS)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('error', response.json())
+
+    def test_invalid_pagination_negative_param(self):
+        """Passing negative values in pagination offset returns 400 Bad Request."""
+        response = self.client.get('/api/v1/jobs/jobs?offset=-10', **AUTH_HEADERS)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('error', response.json())
+
+    def test_metrics_endpoint_telemetry(self):
+        """Metrics endpoint returns 200 OK with Prometheus formatted metrics."""
+        response = self.client.get('/api/v1/metrics')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('hubspot_extractions_total', response.content.decode('utf-8'))

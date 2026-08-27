@@ -1,9 +1,11 @@
 import logging
+import time
 from django.utils import timezone
 from django.db import connection
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from django.http import HttpResponse
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 
 from api.models import ExtractionJob, DealRecord, PipelineMetadata
@@ -21,6 +23,7 @@ from api.serializers import (
 from api.services.extraction_service import DataExtractionService
 
 logger = logging.getLogger(__name__)
+_START_TIME = time.time()
 
 
 class BaseAPIView(APIView):
@@ -56,6 +59,7 @@ class HealthView(BaseAPIView):
 
 class StartScanView(BaseAPIView):
     """Initiates a new data extraction scan job with checkpoint tracking."""
+    throttle_scope = 'scan_start'
 
     @extend_schema(
         summary="Start New Extraction Scan",
@@ -68,7 +72,9 @@ class StartScanView(BaseAPIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         config_data = serializer.validated_data['config']
-        job = DataExtractionService.start_extraction_job(config_data)
+        # Support asynchronous extraction execution while allowing sync for deterministic tests
+        run_async = request.query_params.get('async', 'false').lower() in ('true', '1')
+        job = DataExtractionService.start_extraction_job(config_data, run_async=run_async)
 
         response_data = {
             "status": job.status,
@@ -88,7 +94,8 @@ class ScanResumeView(BaseAPIView):
     def post(self, request, job_id):
         try:
             config_data = request.data.get('config', {}) if isinstance(request.data, dict) else {}
-            job = DataExtractionService.resume_extraction_job(job_id, config_data)
+            run_async = request.query_params.get('async', 'false').lower() in ('true', '1')
+            job = DataExtractionService.resume_extraction_job(job_id, config_data, run_async=run_async)
             serializer = ExtractionJobSerializer(job)
             return Response(serializer.data, status=status.HTTP_200_OK)
         except ExtractionJob.DoesNotExist:
@@ -146,7 +153,7 @@ class ScanResultView(BaseAPIView):
             OpenApiParameter("offset", OpenApiTypes.INT, description="Offset index for pagination", default=0),
             OpenApiParameter("tableName", OpenApiTypes.STR, description="Optional table filter", default="deal_records")
         ],
-        responses={200: JobResultsResponseSerializer, 404: OpenApiTypes.OBJECT}
+        responses={200: JobResultsResponseSerializer, 404: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT}
     )
     def get(self, request, job_id):
         try:
@@ -157,8 +164,26 @@ class ScanResultView(BaseAPIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        limit = int(request.query_params.get('limit', 10))
-        offset = int(request.query_params.get('offset', 0))
+        # Robust pagination input validation (Task 6)
+        try:
+            limit_param = request.query_params.get('limit', 10)
+            offset_param = request.query_params.get('offset', 0)
+            limit = int(limit_param)
+            offset = int(offset_param)
+        except (ValueError, TypeError):
+            return Response(
+                {"error": "Invalid pagination parameters: 'limit' and 'offset' must be valid integers."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if limit < 1 or offset < 0:
+            return Response(
+                {"error": "'limit' must be >= 1 and 'offset' must be >= 0."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Cap limit to 100 to prevent unbounded memory queries
+        limit = min(limit, 100)
 
         total_count = DealRecord.objects.filter(job=job).count()
         records_qs = DealRecord.objects.filter(job=job)[offset:offset + limit]
@@ -223,7 +248,7 @@ class ScanRemoveView(BaseAPIView):
 
 
 class JobListView(BaseAPIView):
-    """Lists all extraction jobs with optional filtering and pagination."""
+    """Lists all extraction jobs with optional filtering and pagination parity."""
 
     @extend_schema(
         summary="List Extraction Jobs",
@@ -232,7 +257,7 @@ class JobListView(BaseAPIView):
             OpenApiParameter("limit", OpenApiTypes.INT, description="Results limit", default=10),
             OpenApiParameter("offset", OpenApiTypes.INT, description="Pagination offset", default=0)
         ],
-        responses={200: ExtractionJobSerializer(many=True)}
+        responses={200: ExtractionJobSerializer(many=True), 400: OpenApiTypes.OBJECT}
     )
     def get(self, request):
         qs = ExtractionJob.objects.all()
@@ -240,23 +265,46 @@ class JobListView(BaseAPIView):
         if org_id:
             qs = qs.filter(organization_id=org_id)
 
-        limit = int(request.query_params.get('limit', 10))
-        offset = int(request.query_params.get('offset', 0))
+        # Robust pagination input validation (Task 6 & Task 11)
+        try:
+            limit_param = request.query_params.get('limit', 10)
+            offset_param = request.query_params.get('offset', 0)
+            limit = int(limit_param)
+            offset = int(offset_param)
+        except (ValueError, TypeError):
+            return Response(
+                {"error": "Invalid pagination parameters: 'limit' and 'offset' must be valid integers."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
+        if limit < 1 or offset < 0:
+            return Response(
+                {"error": "'limit' must be >= 1 and 'offset' must be >= 0."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        limit = min(limit, 100)
         total_count = qs.count()
         paged_qs = qs[offset:offset + limit]
+
+        next_offset = (offset + limit) if (offset + limit) < total_count else None
+        prev_offset = (offset - limit) if (offset - limit) >= 0 else None
+        has_more = (offset + limit) < total_count
 
         serializer = ExtractionJobSerializer(paged_qs, many=True)
         return Response({
             "total_jobs": total_count,
             "limit": limit,
             "offset": offset,
+            "next_offset": next_offset,
+            "prev_offset": prev_offset,
+            "has_more": has_more,
             "jobs": serializer.data
         }, status=status.HTTP_200_OK)
 
 
 class JobStatisticsView(BaseAPIView):
-    """Provides metrics and summary statistics for extraction jobs."""
+    """Provides metrics and calculated summary statistics for extraction jobs."""
 
     @extend_schema(
         summary="Retrieve Extraction Job Statistics",
@@ -271,6 +319,18 @@ class JobStatisticsView(BaseAPIView):
 
         total_records = DealRecord.objects.count()
 
+        # Real DB duration calculation across completed jobs (Task 7)
+        completed_qs = ExtractionJob.objects.filter(
+            status=ExtractionJob.STATUS_COMPLETED,
+            start_time__isnull=False,
+            end_time__isnull=False
+        )
+        durations = [
+            (j.end_time - j.start_time).total_seconds()
+            for j in completed_qs if j.end_time and j.start_time
+        ]
+        avg_extraction_time = round(sum(durations) / len(durations), 2) if durations else 0.0
+
         data = {
             "total_jobs": total_jobs,
             "completed_jobs": completed_jobs,
@@ -278,7 +338,7 @@ class JobStatisticsView(BaseAPIView):
             "pending_jobs": pending_jobs,
             "cancelled_jobs": cancelled_jobs,
             "total_records_extracted": total_records,
-            "average_extraction_time_seconds": 1.42
+            "average_extraction_time_seconds": avg_extraction_time
         }
         return Response(data, status=status.HTTP_200_OK)
 
@@ -292,12 +352,31 @@ class PipelineInfoView(BaseAPIView):
     )
     def get(self, request):
         meta, _ = PipelineMetadata.objects.get_or_create(id=1)
+
+        # Dynamic Pipeline Status Derivation (Task 8)
+        db_ok = True
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+        except Exception:
+            db_ok = False
+
+        total_jobs = ExtractionJob.objects.count()
+        failed_jobs = ExtractionJob.objects.filter(status=ExtractionJob.STATUS_FAILED).count()
+
+        if not db_ok:
+            pipeline_status = "unhealthy"
+        elif total_jobs > 0 and (failed_jobs / total_jobs) > 0.5:
+            pipeline_status = "degraded"
+        else:
+            pipeline_status = "healthy"
+
         data = {
             "pipeline_name": meta.pipeline_name,
             "destination_type": meta.destination_type,
             "active_scanners": meta.active_scanners,
             "total_extractions": meta.total_extractions,
-            "status": "healthy",
+            "status": pipeline_status,
             "version": "1.0.0"
         }
         return Response(data, status=status.HTTP_200_OK)
@@ -317,3 +396,53 @@ class StatsView(BaseAPIView):
             "active_pipeline": "hubspot_deals_pipeline",
             "uptime_status": "online"
         }, status=status.HTTP_200_OK)
+
+
+class MetricsView(BaseAPIView):
+    """Prometheus-compatible and JSON observability metrics endpoint (Task 15)."""
+    permission_classes = []
+
+    @extend_schema(
+        summary="Prometheus & Observability Metrics",
+        responses={200: OpenApiTypes.STR}
+    )
+    def get(self, request):
+        total_jobs = ExtractionJob.objects.count()
+        completed_jobs = ExtractionJob.objects.filter(status=ExtractionJob.STATUS_COMPLETED).count()
+        failed_jobs = ExtractionJob.objects.filter(status=ExtractionJob.STATUS_FAILED).count()
+        total_records = DealRecord.objects.count()
+        uptime_seconds = round(time.time() - _START_TIME, 2)
+
+        format_type = request.query_params.get('format', 'prometheus')
+
+        if format_type == 'json':
+            return Response({
+                "hubspot_extractions_total": total_jobs,
+                "hubspot_extractions_completed_total": completed_jobs,
+                "hubspot_extractions_failed_total": failed_jobs,
+                "hubspot_deals_extracted_total": total_records,
+                "hubspot_service_uptime_seconds": uptime_seconds
+            })
+
+        # Standard Prometheus exposition format
+        metrics_text = f"""# HELP hubspot_extractions_total Total number of extraction jobs created
+# TYPE hubspot_extractions_total counter
+hubspot_extractions_total {total_jobs}
+
+# HELP hubspot_extractions_completed_total Total completed extraction jobs
+# TYPE hubspot_extractions_completed_total counter
+hubspot_extractions_completed_total {completed_jobs}
+
+# HELP hubspot_extractions_failed_total Total failed extraction jobs
+# TYPE hubspot_extractions_failed_total counter
+hubspot_extractions_failed_total {failed_jobs}
+
+# HELP hubspot_deals_extracted_total Total deals records stored
+# TYPE hubspot_deals_extracted_total counter
+hubspot_deals_extracted_total {total_records}
+
+# HELP hubspot_service_uptime_seconds Process uptime in seconds
+# TYPE hubspot_service_uptime_seconds gauge
+hubspot_service_uptime_seconds {uptime_seconds}
+"""
+        return HttpResponse(metrics_text, content_type="text/plain; version=0.0.4")

@@ -11,13 +11,15 @@ from api.views import (
     JobListView,
     JobStatisticsView,
     PipelineInfoView,
-    StatsView
+    StatsView,
+    MetricsView
 )
 from api.visualizations import VisualizationDataView, DashboardView
 
 urlpatterns = [
-    # Health & System Status
+    # Health, System Status & Metrics
     path('health', HealthView.as_view(), name='health'),
+    path('metrics', MetricsView.as_view(), name='metrics'),
     path('pipeline/info', PipelineInfoView.as_view(), name='pipeline-info'),
     path('stats', StatsView.as_view(), name='stats'),
 
