@@ -7,6 +7,7 @@ from django.db import transaction
 from api.models import ExtractionJob, DealRecord, PipelineMetadata
 from api.services.token_encryption import encrypt_token, decrypt_token
 from .hubspot_service import HubspotAPIService
+from .data_source import transform_deal_record, DealsDataSource
 
 logger = logging.getLogger(__name__)
 

@@ -1,0 +1,19 @@
+{
+  "project_name": "hubspot-deals-etl",
+  "service_name": "hubspot_deals",
+  "ports": {
+    "dev": 5200,
+    "stage": 5201,
+    "prod": 5202
+  },
+  "database": {
+    "engine": "postgresql",
+    "schema": "hubspot_deals",
+    "table": "deal_records"
+  },
+  "hubspot": {
+    "api_version": "v3",
+    "endpoint": "/crm/v3/objects/deals",
+    "required_scopes": ["crm.objects.deals.read"]
+  }
+}

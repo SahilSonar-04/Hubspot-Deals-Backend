@@ -1,37 +1,52 @@
 [
   {
-    "deal_id": "101",
-    "name": "Small Business Starter Package",
-    "amount": 5000.00,
-    "stage": "qualifiedtobuy",
-    "close_date": "2026-03-15T00:00:00Z"
+    "id": "101",
+    "dealname": "Small Business Starter Package",
+    "amount": "5000.00",
+    "dealstage": "qualifiedtobuy",
+    "pipeline": "default",
+    "closedate": "2026-03-15T00:00:00Z",
+    "createdate": "2026-01-10T12:00:00Z",
+    "description": "Introductory CRM setup and pipeline onboarding for small business tier."
   },
   {
-    "deal_id": "102",
-    "name": "Mid-Market Growth Retainer",
-    "amount": 25000.00,
-    "stage": "presentationscheduled",
-    "close_date": "2026-04-30T00:00:00Z"
+    "id": "102",
+    "dealname": "Mid-Market Growth Retainer",
+    "amount": "25000.00",
+    "dealstage": "presentationscheduled",
+    "pipeline": "default",
+    "closedate": "2026-04-30T00:00:00Z",
+    "createdate": "2026-01-15T10:00:00Z",
+    "description": "Quarterly consulting and sales enablement retainer."
   },
   {
-    "deal_id": "103",
-    "name": "Enterprise Software Platform",
-    "amount": 50000.00,
-    "stage": "closedwon",
-    "close_date": "2026-05-10T00:00:00Z"
+    "id": "103",
+    "dealname": "Enterprise Cloud Migration",
+    "amount": "50000.00",
+    "dealstage": "decisionmakerboughtin",
+    "pipeline": "default",
+    "closedate": "2026-05-15T00:00:00Z",
+    "createdate": "2026-01-20T08:30:00Z",
+    "description": "Multi-region database cloud migration and infrastructure modernization."
   },
   {
-    "deal_id": "104",
-    "name": "Cloud Transformation Solution",
-    "amount": 75000.00,
-    "stage": "decisionmakerboughtin",
-    "close_date": "2026-06-01T00:00:00Z"
+    "id": "104",
+    "dealname": "Global Systems Integration",
+    "amount": "75000.00",
+    "dealstage": "closedlost",
+    "pipeline": "default",
+    "closedate": "2026-02-28T00:00:00Z",
+    "createdate": "2026-01-05T09:00:00Z",
+    "description": "ERP to HubSpot integration. Lost due to client budget realignment."
   },
   {
-    "deal_id": "105",
-    "name": "Legacy Audit & Security Compliance",
-    "amount": 100000.00,
-    "stage": "closedlost",
-    "close_date": "2026-02-28T00:00:00Z"
+    "id": "105",
+    "dealname": "Annual Enterprise SaaS License",
+    "amount": "100000.00",
+    "dealstage": "closedwon",
+    "pipeline": "default",
+    "closedate": "2026-06-30T00:00:00Z",
+    "createdate": "2026-01-25T14:00:00Z",
+    "description": "500-seat enterprise annual subscription with dedicated SLA support."
   }
 ]

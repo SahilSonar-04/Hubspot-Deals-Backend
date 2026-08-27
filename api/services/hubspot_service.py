@@ -14,12 +14,28 @@ logger = logging.getLogger(__name__)
 class HubspotAPIService:
     """Service to interact with HubSpot CRM API for Deals data with cursor-based pagination."""
 
-    BASE_URL = "https://api.hubapi.com/crm/v3/objects/deals"
+    BASE_URL = os.environ.get("HUBSPOT_DEALS_API_BASE_URL", "https://api.hubapi.com/crm/v3/objects/deals")
 
     def __init__(self, access_token: str = None, timeout: int = 30, max_retries: int = 3):
         self.access_token = access_token or os.environ.get("HUBSPOT_DEALS_API_TOKEN", "")
-        self.timeout = timeout
+        self.timeout = int(os.environ.get("HUBSPOT_DEALS_API_TIMEOUT", timeout))
         self.max_retries = int(os.environ.get("HUBSPOT_DEALS_API_MAX_RETRIES", max_retries))
+
+    def validate_credentials(self) -> bool:
+        """Explicitly validate the provided HubSpot API Private App token."""
+        if self._uses_mock_mode():
+            return True
+        if not self.access_token:
+            return False
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Content-Type": "application/json"
+        }
+        try:
+            response = requests.get(self.BASE_URL, headers=headers, params={"limit": 1}, timeout=self.timeout)
+            return response.status_code == 200
+        except requests.exceptions.RequestException:
+            return False
 
     def _uses_mock_mode(self) -> bool:
         from api.auth import is_automated_testing, is_dev_mode
