@@ -28,7 +28,7 @@ The service supports two authentication methods for security compliance:
 ```json
 {
   "status": "ok",
-  "service": "hubspot_deals_extraction_service",
+  "service": "Hubspot Deals Data Extraction Service",
   "version": "1.0.0",
   "database": "connected"
 }

@@ -1,9 +1,9 @@
 services:
   web:
     build: .
-    command: gunicorn hubspot_project.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120
+    command: gunicorn hubspot_project.wsgi:application --bind 0.0.0.0:5202 --workers 4 --timeout 120
     ports:
-      - "8000:8000"
+      - "5202:5202"
     env_file:
       - .env
     environment:

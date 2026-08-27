@@ -1,3 +1,4 @@
+import os
 import logging
 import uuid
 import threading
@@ -210,24 +211,29 @@ class DataExtractionService:
                 pages_count += 1
                 cursor = next_cursor
 
-                # Atomically save checkpoint state without stomping concurrent status changes
-                with transaction.atomic():
-                    fresh_job = ExtractionJob.objects.select_for_update().get(id=job.id)
-                    if fresh_job.status in [ExtractionJob.STATUS_PAUSED, ExtractionJob.STATUS_CANCELLED]:
-                        logger.info(f"Job {job.job_id} halted mid-checkpoint due to status update: {fresh_job.status}")
-                        return fresh_job
+                # Configurable checkpoint interval (every N pages or final page)
+                checkpoint_interval = getattr(settings, 'CHECKPOINT_INTERVAL_PAGES', int(os.environ.get('CHECKPOINT_INTERVAL_PAGES', '1')))
+                should_checkpoint = (pages_count % checkpoint_interval == 0) or (not has_more) or (pages_count >= max_pages)
 
-                    fresh_job.pages_processed = pages_count
-                    fresh_job.last_cursor = cursor
-                    fresh_job.record_count = len(seen_deal_ids)
-                    fresh_job.checkpoint_data = {
-                        "last_checkpoint_at": timezone.now().isoformat(),
-                        "last_cursor": cursor,
-                        "pages_processed": pages_count,
-                        "total_records": len(seen_deal_ids)
-                    }
-                    fresh_job.save(update_fields=['pages_processed', 'last_cursor', 'record_count', 'checkpoint_data', 'updated_at'])
-                    job = fresh_job
+                if should_checkpoint:
+                    # Atomically save checkpoint state without stomping concurrent status changes
+                    with transaction.atomic():
+                        fresh_job = ExtractionJob.objects.select_for_update().get(id=job.id)
+                        if fresh_job.status in [ExtractionJob.STATUS_PAUSED, ExtractionJob.STATUS_CANCELLED]:
+                            logger.info(f"Job {job.job_id} halted mid-checkpoint due to status update: {fresh_job.status}")
+                            return fresh_job
+
+                        fresh_job.pages_processed = pages_count
+                        fresh_job.last_cursor = cursor
+                        fresh_job.record_count = len(seen_deal_ids)
+                        fresh_job.checkpoint_data = {
+                            "last_checkpoint_at": timezone.now().isoformat(),
+                            "last_cursor": cursor,
+                            "pages_processed": pages_count,
+                            "total_records": len(seen_deal_ids)
+                        }
+                        fresh_job.save(update_fields=['pages_processed', 'last_cursor', 'record_count', 'checkpoint_data', 'updated_at'])
+                        job = fresh_job
 
                 if not has_more or not cursor:
                     break

@@ -221,5 +221,6 @@ LOGGING = {
 # Externalized Extraction Pipeline Settings
 EXTRACTION_MAX_PAGES = int(os.environ.get('EXTRACTION_MAX_PAGES', '10'))
 EXTRACTION_PAGE_LIMIT = int(os.environ.get('EXTRACTION_PAGE_LIMIT', '10'))
+CHECKPOINT_INTERVAL_PAGES = int(os.environ.get('CHECKPOINT_INTERVAL_PAGES', '1'))
 PIPELINE_NAME = os.environ.get('PIPELINE_NAME', 'hubspot_deals_pipeline')
 DATABASE_SCHEMA = os.environ.get('DATABASE_SCHEMA', 'hubspot_deals')

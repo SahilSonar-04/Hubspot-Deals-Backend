@@ -30,10 +30,11 @@ RUN mkdir -p /app/logs && chown -R appuser:appgroup /app
 # Switch to non-root user
 USER appuser
 
-EXPOSE 8000
+ENV PORT=5200
+EXPOSE 5200 5201 5202 8000
 
-# Container Healthcheck (Task 19)
+# Container Healthcheck
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8000/api/v1/health || exit 1
+    CMD curl -f http://localhost:${PORT:-5200}/api/v1/health || curl -f http://localhost:8000/api/v1/health || exit 1
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "120", "hubspot_project.wsgi:application"]
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-5200} --workers 3 --timeout 120 hubspot_project.wsgi:application"]

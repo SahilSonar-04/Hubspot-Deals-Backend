@@ -32,4 +32,4 @@ api/tests/test_seeded_data.py::SeededDataTests::test_remove_job_data PASSED [ 91
 api/tests/test_seeded_data.py::SeededDataTests::test_retrieve_job_statistics PASSED [ 95%]
 api/tests/test_seeded_data.py::SeededDataTests::test_verify_job_status PASSED [100%]
 
-============================== 24 passed in 0.28s ==============================
+============================== 24 passed in 0.27s ==============================
