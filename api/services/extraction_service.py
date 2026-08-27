@@ -42,14 +42,23 @@ class DataExtractionService:
             }
         )
 
-        # Reset records if job previously existed
-        DealRecord.objects.filter(job=job).delete()
+        # Explicitly apply updated configuration and reset state on restart
+        job.organization_id = org_id
+        job.scan_type = scan_types
+        job.filters = filters
+        job.auth_config = stored_auth_config
+        job.start_time = timezone.now()
+        job.end_time = None
+        job.error_message = None
         job.record_count = 0
         job.pages_processed = 0
         job.last_cursor = None
         job.checkpoint_data = {}
         job.status = ExtractionJob.STATUS_IN_PROGRESS
         job.save()
+
+        # Reset records if job previously existed
+        DealRecord.objects.filter(job=job).delete()
 
         if max_pages is None:
             max_pages = getattr(settings, 'EXTRACTION_MAX_PAGES', 10)

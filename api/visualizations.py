@@ -58,7 +58,6 @@ class VisualizationDataView(APIView):
 
 class DashboardView(APIView):
     """HTML Interactive Dashboard View for visual presentation of Hubspot Deals analytics."""
-    permission_classes = []
 
     def get(self, request):
         stage_counts = list(

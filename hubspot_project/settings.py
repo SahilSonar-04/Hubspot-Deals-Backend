@@ -159,6 +159,7 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'Robust RESTful API service for extracting, processing, and serving Hubspot Deals data.',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    'SERVE_PERMISSIONS': ['rest_framework.permissions.AllowAny'],
     'SWAGGER_UI_SETTINGS': {
         'deepLinking': True,
         'persistAuthorization': True,

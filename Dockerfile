@@ -20,12 +20,12 @@ RUN groupadd -g 1000 appgroup && \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application files and grant permissions
+# Copy application files
 COPY . .
-RUN chown -R appuser:appgroup /app
 
-# Collect static files
+# Collect static files and ensure proper non-root ownership of logs and app directory
 RUN python manage.py collectstatic --noinput || true
+RUN mkdir -p /app/logs && chown -R appuser:appgroup /app
 
 # Switch to non-root user
 USER appuser

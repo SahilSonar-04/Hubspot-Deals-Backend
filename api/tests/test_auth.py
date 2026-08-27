@@ -21,3 +21,14 @@ class HeaderAuthenticationTests(TestCase):
         headers = {'HTTP_AUTHORIZATION': 'Bearer bad_token'}
         response = self.client.get('/api/v1/health', **headers)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_dashboard_unauthenticated_returns_401(self):
+        """Accessing the analytics dashboard without authentication returns 401 Unauthorized."""
+        response = self.client.get('/api/v1/visualizations/dashboard')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_dashboard_authenticated_returns_200(self):
+        """Accessing the analytics dashboard with valid authentication returns 200 OK."""
+        headers = {'HTTP_AUTHORIZATION': 'Bearer test_token_12345'}
+        response = self.client.get('/api/v1/visualizations/dashboard', **headers)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
