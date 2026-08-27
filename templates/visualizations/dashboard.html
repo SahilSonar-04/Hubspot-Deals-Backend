@@ -219,12 +219,16 @@
         </section>
     </main>
 
-    <script>
-        const stageData = {{ stage_data|safe }};
-        const jobData = {{ job_data|safe }};
+    <!-- Embedded Data Scripts -->
+    <script id="stage-data-json" type="application/json">{{ stage_data_json|safe }}</script>
+    <script id="job-data-json" type="application/json">{{ job_data_json|safe }}</script>
 
-        // Professional Enterprise Color Palette (Non-AI Theme)
-        const brandColors = ['#ff7a59', '#2563eb', '#10b981', '#f59e0b', '#64748b', '#0284c7'];
+    <script>
+        const stageDataRaw = document.getElementById('stage-data-json').textContent;
+        const jobDataRaw = document.getElementById('job-data-json').textContent;
+
+        const stageData = stageDataRaw ? JSON.parse(stageDataRaw) : [];
+        const jobData = jobDataRaw ? JSON.parse(jobDataRaw) : [];
 
         // Stage Chart
         if (stageData && stageData.length > 0) {
@@ -232,10 +236,10 @@
             new Chart(ctxStage, {
                 type: 'bar',
                 data: {
-                    labels: stageData.map(d => d.stage),
+                    labels: stageData.map(function(d) { return d.stage; }),
                     datasets: [{
                         label: 'Deals Count',
-                        data: stageData.map(d => d.count),
+                        data: stageData.map(function(d) { return d.count; }),
                         backgroundColor: '#ff7a59',
                         borderRadius: 4
                     }]
@@ -267,9 +271,9 @@
             new Chart(ctxJob, {
                 type: 'doughnut',
                 data: {
-                    labels: jobData.map(j => j.status),
+                    labels: jobData.map(function(j) { return j.status; }),
                     datasets: [{
-                        data: jobData.map(j => j.count),
+                        data: jobData.map(function(j) { return j.count; }),
                         backgroundColor: ['#10b981', '#2563eb', '#f59e0b', '#ef4444'],
                         borderWidth: 2,
                         borderColor: '#ffffff'

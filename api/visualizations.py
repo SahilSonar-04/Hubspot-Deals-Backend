@@ -1,3 +1,4 @@
+import json
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.shortcuts import render
@@ -16,21 +17,18 @@ class VisualizationDataView(APIView):
     def get(self, request):
         format_type = request.query_params.get('format', 'json')
 
-        # Deal Stage Distribution
         stage_counts = list(
             DealRecord.objects.values('stage')
             .annotate(count=Count('id'), total_amount=Sum('amount'))
             .order_by('-count')
         )
 
-        # Job Status Distribution
         job_counts = list(
             ExtractionJob.objects.values('status')
             .annotate(count=Count('id'))
             .order_by('-count')
         )
 
-        # Aggregate Metrics
         total_deals = DealRecord.objects.count()
         total_value = DealRecord.objects.aggregate(total=Sum('amount'))['total'] or 0.0
         avg_deal_value = DealRecord.objects.aggregate(avg=Avg('amount'))['avg'] or 0.0
@@ -49,7 +47,11 @@ class VisualizationDataView(APIView):
         }
 
         if format_type == 'html':
-            return render(request, 'visualizations/dashboard.html', {'analytics': data})
+            return render(request, 'visualizations/dashboard.html', {
+                'analytics': data,
+                'stage_data_json': json.dumps(stage_counts),
+                'job_data_json': json.dumps(job_counts),
+            })
 
         return Response(data)
 
@@ -64,6 +66,12 @@ class DashboardView(APIView):
             .annotate(count=Count('id'), total_amount=Sum('amount'))
             .order_by('-count')
         )
+
+        # Convert Decimal values to float for JSON serialization
+        for item in stage_counts:
+            if item.get('total_amount') is not None:
+                item['total_amount'] = float(item['total_amount'])
+
         job_counts = list(
             ExtractionJob.objects.values('status')
             .annotate(count=Count('id'))
@@ -77,7 +85,7 @@ class DashboardView(APIView):
             'total_deals': total_deals,
             'total_value': f"${total_value:,.2f}",
             'avg_value': f"${avg_deal_value:,.2f}",
-            'stage_data': stage_counts,
-            'job_data': job_counts,
+            'stage_data_json': json.dumps(stage_counts),
+            'job_data_json': json.dumps(job_counts),
         }
         return render(request, 'visualizations/dashboard.html', context)
