@@ -1,38 +1,31 @@
-================================================================================
-HubSpot Deals Data Extraction Service - Automated Test Run Verification Log
-================================================================================
-Timestamp: 2026-08-27T23:03:04Z
-Environment: Python 3.14 / Django 5.x / Django REST Framework / Pytest
-Test Framework: pytest-django & unittest
+============================= test session starts ==============================
+platform linux -- Python 3.14.4, pytest-9.1.1, pluggy-1.6.0 -- /home/bloodyfang_04/Projects/Hubspot/hubspot-deals-backend/venv/bin/python3
+cachedir: .pytest_cache
+django: version: 6.1, settings: hubspot_project.settings (from ini)
+rootdir: /home/bloodyfang_04/Projects/Hubspot/hubspot-deals-backend
+configfile: pytest.ini
+plugins: django-4.14.0
+collecting ... collected 20 items
 
---------------------------------------------------------------------------------
-Test Execution Results
---------------------------------------------------------------------------------
-api/tests/test_auth.py::HeaderAuthenticationTests::test_valid_api_key_header PASSED
-api/tests/test_auth.py::HeaderAuthenticationTests::test_valid_bearer_token_header PASSED
-api/tests/test_auth.py::HeaderAuthenticationTests::test_invalid_bearer_token_header PASSED
-
-api/tests/test_checkpoint_resume.py::CheckpointResumeTests::test_checkpoint_saving_and_job_resume PASSED
-
-api/tests/test_edge_cases.py::EdgeCaseTests::test_status_non_existent_job PASSED
-api/tests/test_edge_cases.py::EdgeCaseTests::test_result_non_existent_job PASSED
-api/tests/test_edge_cases.py::EdgeCaseTests::test_cancel_non_existent_job PASSED
-api/tests/test_edge_cases.py::EdgeCaseTests::test_remove_non_existent_job PASSED
-api/tests/test_edge_cases.py::EdgeCaseTests::test_start_scan_missing_auth PASSED
-api/tests/test_edge_cases.py::EdgeCaseTests::test_invalid_pagination_string_param PASSED
-api/tests/test_edge_cases.py::EdgeCaseTests::test_invalid_pagination_negative_param PASSED
-api/tests/test_edge_cases.py::EdgeCaseTests::test_metrics_endpoint_telemetry PASSED
-
-api/tests/test_real_extraction.py::RealExtractionTests::test_start_and_complete_scan_job PASSED
-
-api/tests/test_seeded_data.py::SeededDataTests::test_verify_job_status PASSED
-api/tests/test_seeded_data.py::SeededDataTests::test_fetch_extraction_results PASSED
-api/tests/test_seeded_data.py::SeededDataTests::test_list_all_jobs PASSED
-api/tests/test_seeded_data.py::SeededDataTests::test_retrieve_job_statistics PASSED
-api/tests/test_seeded_data.py::SeededDataTests::test_cancel_pending_job PASSED
-api/tests/test_seeded_data.py::SeededDataTests::test_remove_job_data PASSED
-api/tests/test_seeded_data.py::SeededDataTests::test_pipeline_info PASSED
+api/tests/test_auth.py::HeaderAuthenticationTests::test_invalid_bearer_token_header PASSED [  5%]
+api/tests/test_auth.py::HeaderAuthenticationTests::test_valid_api_key_header PASSED [ 10%]
+api/tests/test_auth.py::HeaderAuthenticationTests::test_valid_bearer_token_header PASSED [ 15%]
+api/tests/test_checkpoint_resume.py::CheckpointResumeTests::test_checkpoint_saving_and_job_resume PASSED [ 20%]
+api/tests/test_edge_cases.py::EdgeCaseTests::test_cancel_non_existent_job PASSED [ 25%]
+api/tests/test_edge_cases.py::EdgeCaseTests::test_invalid_pagination_negative_param PASSED [ 30%]
+api/tests/test_edge_cases.py::EdgeCaseTests::test_invalid_pagination_string_param PASSED [ 35%]
+api/tests/test_edge_cases.py::EdgeCaseTests::test_metrics_endpoint_telemetry PASSED [ 40%]
+api/tests/test_edge_cases.py::EdgeCaseTests::test_remove_non_existent_job PASSED [ 45%]
+api/tests/test_edge_cases.py::EdgeCaseTests::test_result_non_existent_job PASSED [ 50%]
+api/tests/test_edge_cases.py::EdgeCaseTests::test_start_scan_missing_auth PASSED [ 55%]
+api/tests/test_edge_cases.py::EdgeCaseTests::test_status_non_existent_job PASSED [ 60%]
+api/tests/test_real_extraction.py::RealExtractionTests::test_start_and_complete_scan_job PASSED [ 65%]
+api/tests/test_seeded_data.py::SeededDataTests::test_cancel_pending_job PASSED [ 70%]
+api/tests/test_seeded_data.py::SeededDataTests::test_fetch_extraction_results PASSED [ 75%]
+api/tests/test_seeded_data.py::SeededDataTests::test_health_check PASSED [ 80%]
+api/tests/test_seeded_data.py::SeededDataTests::test_list_all_jobs PASSED [ 85%]
+api/tests/test_seeded_data.py::SeededDataTests::test_remove_job_data PASSED [ 90%]
+api/tests/test_seeded_data.py::SeededDataTests::test_retrieve_job_statistics PASSED [ 95%]
+api/tests/test_seeded_data.py::SeededDataTests::test_verify_job_status PASSED [100%]
 
 ============================== 20 passed in 0.25s ==============================
-Status: ALL TESTS PASSED (100% Success Rate)
-================================================================================

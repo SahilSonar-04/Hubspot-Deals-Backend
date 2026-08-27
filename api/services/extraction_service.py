@@ -79,13 +79,15 @@ class DataExtractionService:
         if config_data and 'auth' in config_data:
             token = config_data['auth'].get('accessToken', '')
 
-        if not token and job.auth_config:
-            stored_enc = job.auth_config.get('accessToken', '')
-            token = decrypt_token(stored_enc)
+        stored_enc = job.auth_config.get('accessToken', '') if job.auth_config else ''
+        stored_token = decrypt_token(stored_enc) if stored_enc else ''
 
-        if token and job.auth_config.get('accessToken') != encrypt_token(token):
+        if not token:
+            token = stored_token
+
+        if token and token != stored_token:
             job.auth_config = {
-                **job.auth_config,
+                **(job.auth_config or {}),
                 'token_provided': bool(token),
                 'accessToken': encrypt_token(token)
             }

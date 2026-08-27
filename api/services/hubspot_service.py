@@ -31,7 +31,8 @@ class HubspotAPIService:
             or self.access_token == "your-token-here"
         )
         if is_placeholder_or_empty:
-            if not getattr(settings, 'DEBUG', False):
+            from api.auth import is_dev_or_testing
+            if not is_dev_or_testing():
                 raise HubspotAPIError("Invalid or missing HubSpot API access token in production environment.")
             return True
         return False

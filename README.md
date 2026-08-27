@@ -36,6 +36,7 @@ A robust, enterprise-grade **Django REST Framework (DRF)** backend service desig
 | `GET` | `/api/v1/jobs/jobs` | List extraction jobs with pagination | Yes |
 | `GET` | `/api/v1/jobs/statistics` | Summary metrics & average extraction durations | Yes |
 | `GET` | `/api/v1/pipeline/info` | Pipeline metadata & dynamic status check | Yes |
+| `GET` | `/api/v1/stats` | Overall service and pipeline statistics | Yes |
 | `GET` | `/api/v1/visualizations/dashboard` | Visual analytics & telemetry dashboard | Yes |
 
 ---
