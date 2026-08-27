@@ -1,22 +1,35 @@
 import os
+import time
+import random
 import logging
 import requests
 from typing import List, Dict, Any, Tuple
 
+from api.exceptions import HubspotAPIError
+
 logger = logging.getLogger(__name__)
+
 
 class HubspotAPIService:
     """Service to interact with HubSpot CRM API for Deals data with cursor-based pagination."""
 
     BASE_URL = "https://api.hubapi.com/crm/v3/objects/deals"
 
-    def __init__(self, access_token: str = None, timeout: int = 30):
+    def __init__(self, access_token: str = None, timeout: int = 30, max_retries: int = 3):
         self.access_token = access_token or os.environ.get("HUBSPOT_DEALS_API_TOKEN", "")
         self.timeout = timeout
+        self.max_retries = int(os.environ.get("HUBSPOT_DEALS_API_MAX_RETRIES", max_retries))
+
+    def _uses_mock_mode(self) -> bool:
+        return (
+            not self.access_token
+            or self.access_token.startswith("test_")
+            or self.access_token == "your-token-here"
+        )
 
     def fetch_deals_page(self, properties: List[str] = None, limit: int = 10, after_cursor: str = None, include_archived: bool = False) -> Tuple[List[Dict[str, Any]], str, bool]:
         """Fetch a single page of deal records using HubSpot cursor-based pagination."""
-        if not self.access_token or self.access_token.startswith("test_") or self.access_token == "your-token-here":
+        if self._uses_mock_mode():
             logger.info(f"Using mock/test mode for HubSpot fetch (after_cursor={after_cursor})")
             return self._generate_mock_deals_page(limit=limit, after_cursor=after_cursor)
 
@@ -24,7 +37,7 @@ class HubspotAPIService:
             "Authorization": f"Bearer {self.access_token}",
             "Content-Type": "application/json"
         }
-        
+
         default_props = ["dealname", "amount", "dealstage", "pipeline", "closedate"]
         props_to_fetch = list(set((properties or []) + default_props))
 
@@ -36,35 +49,65 @@ class HubspotAPIService:
         if after_cursor:
             params["after"] = after_cursor
 
-        try:
-            response = requests.get(self.BASE_URL, headers=headers, params=params, timeout=self.timeout)
-            response.raise_for_status()
-            data = response.json()
-            results = data.get("results", [])
+        return self._fetch_with_retry(headers, params)
 
-            deals = []
-            for item in results:
-                props = item.get("properties", {})
-                deal = {
-                    "deal_id": item.get("id"),
-                    "name": props.get("dealname", f"Deal {item.get('id')}"),
-                    "amount": float(props.get("amount")) if props.get("amount") else 0.0,
-                    "stage": props.get("dealstage", "qualifiedtobuy"),
-                    "pipeline": props.get("pipeline", "default"),
-                    "close_date": props.get("closedate"),
-                    "archived": item.get("archived", False),
-                    "properties": props
-                }
-                deals.append(deal)
+    def _fetch_with_retry(self, headers: dict, params: dict) -> Tuple[List[Dict[str, Any]], str, bool]:
+        attempt = 0
+        delay = 1.0
+        last_error = None
 
-            paging = data.get("paging", {})
-            next_cursor = paging.get("next", {}).get("after")
-            has_more = bool(next_cursor)
-            return deals, next_cursor, has_more
+        while attempt <= self.max_retries:
+            try:
+                response = requests.get(self.BASE_URL, headers=headers, params=params, timeout=self.timeout)
 
-        except Exception as e:
-            logger.warning(f"Error calling real HubSpot API ({e}), falling back to test deals page")
-            return self._generate_mock_deals_page(limit=limit, after_cursor=after_cursor)
+                if response.status_code == 429 or response.status_code >= 500:
+                    last_error = f"HTTP {response.status_code} from HubSpot API"
+                    if attempt < self.max_retries:
+                        sleep_for = delay + random.uniform(0, 0.5)
+                        logger.warning(f"{last_error}, retrying in {sleep_for:.1f}s (attempt {attempt + 1}/{self.max_retries})")
+                        time.sleep(sleep_for)
+                        delay *= 2
+                        attempt += 1
+                        continue
+                    raise HubspotAPIError(last_error)
+
+                response.raise_for_status()
+                return self._parse_deals_response(response.json())
+
+            except requests.exceptions.RequestException as e:
+                last_error = str(e)
+                if attempt < self.max_retries:
+                    sleep_for = delay + random.uniform(0, 0.5)
+                    logger.warning(f"HubSpot API request failed ({last_error}), retrying in {sleep_for:.1f}s")
+                    time.sleep(sleep_for)
+                    delay *= 2
+                    attempt += 1
+                    continue
+                raise HubspotAPIError(f"HubSpot API request failed after {self.max_retries} retries: {last_error}")
+
+        raise HubspotAPIError(last_error or "Unknown HubSpot API error")
+
+    def _parse_deals_response(self, data: dict) -> Tuple[List[Dict[str, Any]], str, bool]:
+        results = data.get("results", [])
+        deals = []
+        for item in results:
+            props = item.get("properties", {})
+            deal = {
+                "deal_id": item.get("id"),
+                "name": props.get("dealname", f"Deal {item.get('id')}"),
+                "amount": float(props.get("amount")) if props.get("amount") else 0.0,
+                "stage": props.get("dealstage", "qualifiedtobuy"),
+                "pipeline": props.get("pipeline", "default"),
+                "close_date": props.get("closedate"),
+                "archived": item.get("archived", False),
+                "properties": props
+            }
+            deals.append(deal)
+
+        paging = data.get("paging", {})
+        next_cursor = paging.get("next", {}).get("after")
+        has_more = bool(next_cursor)
+        return deals, next_cursor, has_more
 
     def fetch_deals(self, properties: List[str] = None, limit: int = 50, include_archived: bool = False) -> List[Dict[str, Any]]:
         """Fetch all deals across pages."""
@@ -138,7 +181,6 @@ class HubspotAPIService:
             }
         ]
 
-        # Determine starting index based on cursor
         start_index = 0
         if after_cursor == "cursor_page_1":
             start_index = 2
@@ -148,8 +190,7 @@ class HubspotAPIService:
             return [], None, False
 
         page_items = all_mock_deals[start_index:start_index + limit]
-        
-        # Calculate next cursor
+
         next_index = start_index + len(page_items)
         if next_index >= len(all_mock_deals):
             next_cursor = None
