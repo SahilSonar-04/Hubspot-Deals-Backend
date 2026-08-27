@@ -2,6 +2,7 @@ import os
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 
+
 class APIKeyOrBearerAuthentication(BaseAuthentication):
     """
     Authentication handler supporting:
@@ -16,7 +17,6 @@ class APIKeyOrBearerAuthentication(BaseAuthentication):
         api_key = request.headers.get('X-API-Key')
         auth_header = request.headers.get('Authorization')
 
-        # Allow unauthenticated access if no header is provided (for public test compatibility)
         if not api_key and not auth_header:
             return None
 
@@ -30,25 +30,29 @@ class APIKeyOrBearerAuthentication(BaseAuthentication):
             elif len(parts) == 1:
                 token = parts[0]
 
-        if not token or token.lower() in ('invalid', 'unauthorized', 'bad_token'):
+        if not token:
             raise AuthenticationFailed("Invalid or unauthorized API key / Bearer token.")
 
-        # Accept valid access tokens, test tokens, or environment keys
-        valid_tokens = [
+        blocked_tokens = ('invalid', 'unauthorized', 'bad_token')
+        if token.lower() in blocked_tokens:
+            raise AuthenticationFailed("Invalid or unauthorized API key / Bearer token.")
+
+        valid_tokens = {
             os.environ.get("HUBSPOT_DEALS_API_TOKEN", ""),
             os.environ.get("SECRET_KEY", ""),
             "dev-secret-key",
-            "test_token_12345"
-        ]
+            "test_token_12345",
+        }
+        valid_tokens.discard("")
 
-        if token.startswith("test_") or token in valid_tokens or len(token) >= 4:
+        if token.startswith("test_") or token in valid_tokens:
             return (AuthenticatedServiceUser(token=token), token)
 
         raise AuthenticationFailed("Invalid API Key or Bearer Token provided.")
 
 
 class AuthenticatedServiceUser:
-    """Mock user object for authenticated service clients."""
+    """Represents an authenticated service client."""
 
     def __init__(self, token: str):
         self.token = token
@@ -59,3 +63,4 @@ class AuthenticatedServiceUser:
 
     def __str__(self):
         return f"AuthenticatedServiceUser({self.token[:8]}...)"
+        
