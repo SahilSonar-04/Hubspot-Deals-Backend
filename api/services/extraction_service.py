@@ -3,6 +3,7 @@ import uuid
 import threading
 from django.utils import timezone
 from django.conf import settings
+from django.db import transaction
 from api.models import ExtractionJob, DealRecord, PipelineMetadata
 from api.services.token_encryption import encrypt_token, decrypt_token
 from .hubspot_service import HubspotAPIService
@@ -23,37 +24,40 @@ class DataExtractionService:
         filters = config_data.get('filters', {})
 
         raw_token = auth.get('accessToken', '')
-        encrypted_token = encrypt_token(raw_token) if raw_token else ""
+        # Encrypt access token at rest for secure storage
+        stored_auth_config = {
+            'token_provided': bool(raw_token),
+            'accessToken': encrypt_token(raw_token) if raw_token else ''
+        }
 
-        if max_pages is None:
-            max_pages = getattr(settings, 'EXTRACTION_MAX_PAGES', 10)
-
-        job, _ = ExtractionJob.objects.update_or_create(
+        job, _ = ExtractionJob.objects.get_or_create(
             job_id=job_id,
             defaults={
                 'organization_id': org_id,
                 'scan_type': scan_types,
                 'status': ExtractionJob.STATUS_IN_PROGRESS,
-                'auth_config': {'token_provided': bool(raw_token), 'accessToken': encrypted_token},
                 'filters': filters,
-                'start_time': timezone.now(),
-                'end_time': None,
-                'error_message': None,
-                'record_count': 0,
-                'last_cursor': None,
-                'pages_processed': 0,
-                'checkpoint_data': {}
+                'auth_config': stored_auth_config,
+                'start_time': timezone.now()
             }
         )
+
+        # Reset records if job previously existed
+        DealRecord.objects.filter(job=job).delete()
+        job.record_count = 0
+        job.pages_processed = 0
+        job.last_cursor = None
+        job.checkpoint_data = {}
+        job.status = ExtractionJob.STATUS_IN_PROGRESS
+        job.save()
+
+        if max_pages is None:
+            max_pages = getattr(settings, 'EXTRACTION_MAX_PAGES', 10)
 
         props = filters.get('properties', [])
         include_archived = filters.get('includeArchived', False)
 
-        # Clear existing deal records for re-runs
-        DealRecord.objects.filter(job=job).delete()
-
         if run_async:
-            # Asynchronous background execution (Task 9)
             thread = threading.Thread(
                 target=DataExtractionService._run_async_wrapper,
                 args=(job.job_id, raw_token, props, include_archived, max_pages, None),
@@ -116,7 +120,7 @@ class DataExtractionService:
 
     @staticmethod
     def _run_async_wrapper(job_id: str, token: str, props: list, include_archived: bool, max_pages: int, start_cursor: str):
-        """Worker thread entry point for async extractions."""
+        """Worker thread entry point for async background extraction."""
         try:
             job = ExtractionJob.objects.get(job_id=job_id)
             hubspot_service = HubspotAPIService(access_token=token)
@@ -124,13 +128,13 @@ class DataExtractionService:
                 job, hubspot_service, props, include_archived, max_pages=max_pages, start_cursor=start_cursor
             )
         except Exception as e:
-            logger.error(f"Async extraction runner failed for job {job_id}: {e}")
+            logger.error(f"Async extraction worker failed for job {job_id}: {e}")
             try:
                 failed_job = ExtractionJob.objects.get(job_id=job_id)
                 failed_job.status = ExtractionJob.STATUS_FAILED
                 failed_job.error_message = str(e)
                 failed_job.end_time = timezone.now()
-                failed_job.save()
+                failed_job.save(update_fields=['status', 'error_message', 'end_time', 'updated_at'])
             except Exception:
                 pass
 
@@ -143,18 +147,22 @@ class DataExtractionService:
         max_pages: int = 10,
         start_cursor: str = None
     ) -> ExtractionJob:
-        """Internal pipeline runner processing pages and persisting cursor checkpoints."""
+        """Internal pipeline runner processing pages and persisting cursor checkpoints atomically."""
         cursor = start_cursor
         pages_count = job.pages_processed
         page_size = getattr(settings, 'EXTRACTION_PAGE_LIMIT', 10)
 
+        # Scale-friendly O(n) in-memory tracking of unique deals across pages
+        seen_deal_ids = set(DealRecord.objects.filter(job=job).values_list('deal_id', flat=True))
+
         try:
             while pages_count < max_pages:
-                # Check for concurrent pause/cancel request
-                fresh_job = ExtractionJob.objects.get(id=job.id)
-                if fresh_job.status in [ExtractionJob.STATUS_PAUSED, ExtractionJob.STATUS_CANCELLED]:
-                    logger.info(f"Job {job.job_id} halted due to external status update: {fresh_job.status}")
-                    return fresh_job
+                # Atomically check for external pause/cancel request
+                with transaction.atomic():
+                    fresh_job = ExtractionJob.objects.select_for_update().get(id=job.id)
+                    if fresh_job.status in [ExtractionJob.STATUS_PAUSED, ExtractionJob.STATUS_CANCELLED]:
+                        logger.info(f"Job {job.job_id} halted due to external status update: {fresh_job.status}")
+                        return fresh_job
 
                 deals_page, next_cursor, has_more = hubspot_service.fetch_deals_page(
                     properties=props,
@@ -164,13 +172,12 @@ class DataExtractionService:
                 )
 
                 now_ts = timezone.now()
-                existing_deal_ids = set(DealRecord.objects.filter(job=job).values_list('deal_id', flat=True))
                 deal_records = []
                 for deal_item in deals_page:
                     d_id = str(deal_item.get('deal_id'))
-                    if d_id in existing_deal_ids:
+                    if d_id in seen_deal_ids:
                         continue
-                    existing_deal_ids.add(d_id)
+                    seen_deal_ids.add(d_id)
                     record = DealRecord(
                         job=job,
                         deal_id=d_id,
@@ -193,24 +200,35 @@ class DataExtractionService:
                 pages_count += 1
                 cursor = next_cursor
 
-                # Save Checkpoint state after each page
-                job.pages_processed = pages_count
-                job.last_cursor = cursor
-                job.record_count = DealRecord.objects.filter(job=job).count()
-                job.checkpoint_data = {
-                    "last_checkpoint_at": timezone.now().isoformat(),
-                    "last_cursor": cursor,
-                    "pages_processed": pages_count,
-                    "total_records": job.record_count
-                }
-                job.save()
+                # Atomically save checkpoint state without stomping concurrent status changes
+                with transaction.atomic():
+                    fresh_job = ExtractionJob.objects.select_for_update().get(id=job.id)
+                    if fresh_job.status in [ExtractionJob.STATUS_PAUSED, ExtractionJob.STATUS_CANCELLED]:
+                        logger.info(f"Job {job.job_id} halted mid-checkpoint due to status update: {fresh_job.status}")
+                        return fresh_job
+
+                    fresh_job.pages_processed = pages_count
+                    fresh_job.last_cursor = cursor
+                    fresh_job.record_count = len(seen_deal_ids)
+                    fresh_job.checkpoint_data = {
+                        "last_checkpoint_at": timezone.now().isoformat(),
+                        "last_cursor": cursor,
+                        "pages_processed": pages_count,
+                        "total_records": len(seen_deal_ids)
+                    }
+                    fresh_job.save(update_fields=['pages_processed', 'last_cursor', 'record_count', 'checkpoint_data', 'updated_at'])
+                    job = fresh_job
 
                 if not has_more or not cursor:
                     break
 
-            job.status = ExtractionJob.STATUS_COMPLETED
-            job.end_time = timezone.now()
-            job.save()
+            with transaction.atomic():
+                fresh_job = ExtractionJob.objects.select_for_update().get(id=job.id)
+                if fresh_job.status not in [ExtractionJob.STATUS_PAUSED, ExtractionJob.STATUS_CANCELLED]:
+                    fresh_job.status = ExtractionJob.STATUS_COMPLETED
+                    fresh_job.end_time = timezone.now()
+                    fresh_job.save(update_fields=['status', 'end_time', 'updated_at'])
+                    job = fresh_job
 
             # Update global pipeline telemetry
             meta, _ = PipelineMetadata.objects.get_or_create(id=1)
@@ -221,34 +239,42 @@ class DataExtractionService:
 
         except Exception as e:
             logger.error(f"Extraction job {job.job_id} failed in pipeline: {e}")
-            job.status = ExtractionJob.STATUS_FAILED
-            job.error_message = str(e)
-            job.end_time = timezone.now()
-            job.save()
+            with transaction.atomic():
+                failed_job = ExtractionJob.objects.select_for_update().get(id=job.id)
+                failed_job.status = ExtractionJob.STATUS_FAILED
+                failed_job.error_message = str(e)
+                failed_job.end_time = timezone.now()
+                failed_job.save(update_fields=['status', 'error_message', 'end_time', 'updated_at'])
+                job = failed_job
             raise
 
     @staticmethod
     def pause_job(job_id: str) -> ExtractionJob:
         """Pause a running extraction job."""
-        job = ExtractionJob.objects.get(job_id=job_id)
-        if job.status in [ExtractionJob.STATUS_PENDING, ExtractionJob.STATUS_IN_PROGRESS]:
-            job.status = ExtractionJob.STATUS_PAUSED
-            job.save()
+        with transaction.atomic():
+            job = ExtractionJob.objects.select_for_update().get(job_id=job_id)
+            if job.status in [ExtractionJob.STATUS_PENDING, ExtractionJob.STATUS_IN_PROGRESS]:
+                job.status = ExtractionJob.STATUS_PAUSED
+                job.save(update_fields=['status', 'updated_at'])
         return job
 
     @staticmethod
     def cancel_job(job_id: str) -> ExtractionJob:
         """Cancel a pending or running extraction job."""
-        job = ExtractionJob.objects.get(job_id=job_id)
-        if job.status in [ExtractionJob.STATUS_PENDING, ExtractionJob.STATUS_IN_PROGRESS, ExtractionJob.STATUS_PAUSED]:
-            job.status = ExtractionJob.STATUS_CANCELLED
-            job.end_time = timezone.now()
-            job.save()
+        with transaction.atomic():
+            job = ExtractionJob.objects.select_for_update().get(job_id=job_id)
+            if job.status in [ExtractionJob.STATUS_PENDING, ExtractionJob.STATUS_IN_PROGRESS, ExtractionJob.STATUS_PAUSED]:
+                job.status = ExtractionJob.STATUS_CANCELLED
+                job.end_time = timezone.now()
+                job.save(update_fields=['status', 'end_time', 'updated_at'])
         return job
 
     @staticmethod
     def remove_job(job_id: str) -> bool:
-        """Remove job and associated records from database."""
+        """Remove job records and metadata."""
         job = ExtractionJob.objects.get(job_id=job_id)
+        DealRecord.objects.filter(job=job).delete()
         job.delete()
         return True
+
+    delete_job_data = remove_job

@@ -26,9 +26,9 @@ A robust, enterprise-grade **Django REST Framework (DRF)** backend service desig
 |--------|----------|-------------|---------------|
 | `GET` | `/api/v1/health` | Service health & database connectivity check | No |
 | `GET` | `/api/v1/metrics` | Prometheus observability metrics | No |
-| `POST` | `/api/v1/scan/start` | Initiate new data extraction scan job | Yes |
+| `POST` | `/api/v1/scan/start` | Initiate new data extraction scan job (`async: true` for non-blocking background execution) | Yes |
 | `POST` | `/api/v1/scan/resume/{job_id}` | Resume scan from pagination checkpoint | Yes |
-| `POST` | `/api/v1/scan/pause/{job_id}` | Pause active extraction scan | Yes |
+| `POST` | `/api/v1/scan/pause/{job_id}` | Pause active background/async extraction scan mid-flight | Yes |
 | `GET` | `/api/v1/scan/status/{job_id}` | Get scan lifecycle status & checkpoint data | Yes |
 | `GET` | `/api/v1/scan/result/{job_id}` | Fetch extracted deal records (Paginated) | Yes |
 | `POST` | `/api/v1/scan/cancel/{job_id}` | Cancel pending or running scan job | Yes |
@@ -79,12 +79,19 @@ python manage.py runserver 0.0.0.0:8000
 
 ## 🐳 Docker Deployment
 
+### Local Development:
 ```bash
-# Start all services with PostgreSQL healthcheck gating
+# Start dev services with automatic reload & Postgres readiness gating
 docker compose up --build -d
 
-# Check service logs
+# View logs
 docker compose logs -f web
+```
+
+### Production Deployment:
+```bash
+# Start production Gunicorn cluster with non-root user & secure env
+docker compose -f docker-compose.prod.yml up --build -d
 ```
 
 ---

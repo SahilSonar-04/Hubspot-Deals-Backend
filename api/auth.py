@@ -5,13 +5,16 @@ from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 
 
-def is_dev_or_testing() -> bool:
-    """Return True if running in DEBUG mode or under an automated test suite."""
-    if getattr(settings, 'DEBUG', False):
-        return True
+def is_automated_testing() -> bool:
+    """Return True if executing within an automated test runner."""
     if 'test' in sys.argv or 'pytest' in sys.modules or getattr(settings, 'TESTING', False):
         return True
     return False
+
+
+def is_dev_mode() -> bool:
+    """Return True only if DEBUG is explicitly enabled."""
+    return bool(getattr(settings, 'DEBUG', False))
 
 
 class APIKeyOrBearerAuthentication(BaseAuthentication):
@@ -58,11 +61,15 @@ class APIKeyOrBearerAuthentication(BaseAuthentication):
         if api_auth_token:
             allowed_tokens.add(api_auth_token)
 
-        # In DEBUG / local dev / automated test suite ONLY, accept test tokens
-        if is_dev_or_testing():
+        # Under automated test suite runs ONLY, accept test suite tokens
+        if is_automated_testing():
             allowed_tokens.update({"dev-secret-key", "test_token_12345"})
             if token.startswith("test_"):
                 return (AuthenticatedServiceUser(token=token), token)
+
+        # In local dev DEBUG mode (non-test), only allow known static dev tokens, NOT arbitrary test_*
+        elif is_dev_mode():
+            allowed_tokens.update({"dev-secret-key", "test_token_12345"})
 
         if token in allowed_tokens:
             return (AuthenticatedServiceUser(token=token), token)

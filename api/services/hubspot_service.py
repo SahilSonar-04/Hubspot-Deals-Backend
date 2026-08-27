@@ -22,23 +22,23 @@ class HubspotAPIService:
         self.max_retries = int(os.environ.get("HUBSPOT_DEALS_API_MAX_RETRIES", max_retries))
 
     def _uses_mock_mode(self) -> bool:
-        from api.auth import is_dev_or_testing
+        from api.auth import is_automated_testing, is_dev_mode
 
-        is_placeholder_or_empty = (
+        is_test_or_placeholder = (
             not self.access_token
             or self.access_token.startswith("test_")
             or "your-" in self.access_token.lower()
             or self.access_token in ("your-token-here", "your-hubspot-private-app-token", "placeholder")
         )
 
-        if not is_dev_or_testing():
-            # In production, NEVER allow mock mode or test_/placeholder tokens
-            if is_placeholder_or_empty:
+        # In production (non-test, non-dev), NEVER allow mock mode or test_/placeholder tokens
+        if not is_automated_testing() and not is_dev_mode():
+            if is_test_or_placeholder:
                 raise HubspotAPIError("Invalid or missing HubSpot API access token in production environment.")
             return False
 
-        # In dev or testing environments:
-        return is_placeholder_or_empty
+        # In testing or local dev environments:
+        return is_test_or_placeholder
 
     def fetch_deals_page(self, properties: List[str] = None, limit: int = 10, after_cursor: str = None, include_archived: bool = False) -> Tuple[List[Dict[str, Any]], str, bool]:
         """Fetch a single page of deal records using HubSpot cursor-based pagination."""

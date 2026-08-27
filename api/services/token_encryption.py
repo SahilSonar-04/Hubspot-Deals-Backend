@@ -9,10 +9,12 @@ logger = logging.getLogger(__name__)
 
 
 def _get_fernet_instance() -> Fernet:
-    """Generate a deterministic Fernet key using TOKEN_ENCRYPTION_KEY or SECRET_KEY."""
+    """Generate a deterministic Fernet key using TOKEN_ENCRYPTION_KEY or derived from SECRET_KEY."""
     raw_key = os.environ.get("TOKEN_ENCRYPTION_KEY", "")
     if not raw_key:
-        secret = getattr(settings, "SECRET_KEY", "fallback-secret-key-change-in-production")
+        secret = getattr(settings, "SECRET_KEY", "")
+        if not secret:
+            raise RuntimeError("Cannot initialize token encryptor: neither TOKEN_ENCRYPTION_KEY nor SECRET_KEY is configured.")
         # Derive a 32-byte key via SHA-256 and base64-encode it for Fernet
         derived_32 = hashlib.sha256(secret.encode("utf-8")).digest()
         raw_key = base64.urlsafe_b64encode(derived_32).decode("utf-8")
@@ -21,9 +23,7 @@ def _get_fernet_instance() -> Fernet:
         return Fernet(raw_key.encode("utf-8") if isinstance(raw_key, str) else raw_key)
     except Exception as e:
         logger.error(f"Failed to initialize Fernet token encryptor: {e}")
-        # Fallback key derived from SHA-256
-        fallback_32 = hashlib.sha256(b"default-fernet-key-fallback-seed").digest()
-        return Fernet(base64.urlsafe_b64encode(fallback_32))
+        raise RuntimeError(f"Cryptographic initialization error: invalid encryption key ({e})") from e
 
 
 def encrypt_token(token: str) -> str:
@@ -36,7 +36,7 @@ def encrypt_token(token: str) -> str:
         return f"enc:{encrypted_bytes.decode('utf-8')}"
     except Exception as e:
         logger.error(f"Error encrypting token: {e}")
-        return token
+        raise RuntimeError(f"Token encryption failed: {e}") from e
 
 
 def decrypt_token(stored_value: str) -> str:
