@@ -1,25 +1,32 @@
 """
-Django settings for hubspot_project project.
+Django settings for hubspot_project.
 """
 
 import os
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Quick-start development settings - unsuitable for production
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-hubspot-deals-extraction-secret-key-2026')
+DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
 
-DEBUG = os.environ.get('FLASK_DEBUG', os.environ.get('DEBUG', 'True')).lower() in ('true', '1', 'yes')
+_DEFAULT_INSECURE_KEY = 'django-insecure-hubspot-deals-extraction-secret-key-2026'
+SECRET_KEY = os.environ.get('SECRET_KEY', _DEFAULT_INSECURE_KEY)
 
-ALLOWED_HOSTS = ['*']
+if not DEBUG and SECRET_KEY == _DEFAULT_INSECURE_KEY:
+    raise ImproperlyConfigured(
+        "SECRET_KEY must be set to a non-default value when DEBUG is False."
+    )
 
-# Application definition
+ALLOWED_HOSTS = [
+    h.strip() for h in os.environ.get(
+        'ALLOWED_HOSTS', '*' if DEBUG else 'localhost,127.0.0.1'
+    ).split(',') if h.strip()
+]
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -27,13 +34,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
-    # Third party apps
+
     'rest_framework',
     'corsheaders',
     'drf_spectacular',
-    
-    # Local apps
+
     'api.apps.ApiConfig',
 ]
 
@@ -69,7 +74,6 @@ TEMPLATES = [
 WSGI_APPLICATION = 'hubspot_project.wsgi.application'
 ASGI_APPLICATION = 'hubspot_project.asgi.application'
 
-# Database
 DB_HOST = os.environ.get('DB_HOST', '')
 DB_NAME = os.environ.get('DB_NAME', '')
 DB_USER = os.environ.get('DB_USER', '')
@@ -95,7 +99,6 @@ else:
         }
     }
 
-# Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -103,33 +106,38 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# Internationalization
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-# Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# CORS configuration
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = DEBUG
+if not DEBUG:
+    CORS_ALLOWED_ORIGINS = [
+        o.strip() for o in os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if o.strip()
+    ]
 
-# Django REST Framework Settings
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'api.auth.APIKeyOrBearerAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
         'rest_framework.renderers.BrowsableAPIRenderer',
     ],
 }
 
-# Swagger / OpenAPI Settings
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Hubspot Deals Data Extraction Service API',
     'DESCRIPTION': 'Robust RESTful API service for extracting, processing, and serving Hubspot Deals data.',
