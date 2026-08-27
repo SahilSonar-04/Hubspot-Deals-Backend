@@ -8,7 +8,7 @@ This document details the PostgreSQL / Django database schema design for storing
 ## 1. Relational Schema Diagram & Models
 
 ### `api_extractionjob` Table
-Stores scan metadata and status lifecycle.
+Stores scan metadata, status lifecycle, and pagination checkpoint state.
 
 ```sql
 CREATE TABLE api_extractionjob (
@@ -16,20 +16,25 @@ CREATE TABLE api_extractionjob (
     job_id VARCHAR(255) UNIQUE NOT NULL,
     organization_id VARCHAR(255),
     scan_type JSONB NOT NULL DEFAULT '[]'::jsonb,
-    status VARCHAR(50) NOT NULL DEFAULT 'pending',
+    status VARCHAR(50) NOT NULL DEFAULT 'pending', -- pending | in_progress | paused | completed | failed | cancelled
     record_count INT NOT NULL DEFAULT 0,
     error_message TEXT,
     filters JSONB NOT NULL DEFAULT '{}'::jsonb,
-    auth_config JSONB NOT NULL DEFAULT '{}'::jsonb,
+    auth_config JSONB NOT NULL DEFAULT '{}'::jsonb, -- stores token_provided flag and accessToken (plaintext, required for resume)
     start_time TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     end_time TIMESTAMPTZ,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_cursor VARCHAR(255),
+    pages_processed INT NOT NULL DEFAULT 0,
+    checkpoint_data JSONB NOT NULL DEFAULT '{}'::jsonb
 );
 
 CREATE INDEX idx_extractionjob_job_id ON api_extractionjob(job_id);
 CREATE INDEX idx_extractionjob_org_id ON api_extractionjob(organization_id);
 CREATE INDEX idx_extractionjob_status ON api_extractionjob(status);
 ```
+
+`auth_config.accessToken` is stored so `/scan/resume/{job_id}` can continue extraction without the caller resupplying credentials. This is plaintext in the current implementation and is never returned by the API (`ExtractionJobSerializer` omits `auth_config`); a production deployment should move this to a proper secrets store.
 
 ---
 
@@ -49,8 +54,7 @@ CREATE TABLE api_dealrecord (
     archived BOOLEAN NOT NULL DEFAULT FALSE,
     properties JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    
-    -- Mandatory ETL Metadata Fields
+
     _extracted_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     _scan_id VARCHAR(255) NOT NULL DEFAULT '',
     _tenant_id VARCHAR(255) NOT NULL DEFAULT 'default-tenant'
@@ -74,7 +78,18 @@ CREATE INDEX idx_dealrecord_scan ON api_dealrecord(_scan_id);
 
 ---
 
-## 3. Data Type Mapping
+## 3. Checkpoint & Resume Fields
+
+| Field Name | Type | Description |
+|------------|------|-------------|
+| `last_cursor` | VARCHAR(255) | HubSpot pagination cursor to resume from |
+| `pages_processed` | INT | Number of pages fetched so far |
+| `checkpoint_data` | JSONB | Snapshot of checkpoint state (cursor, page count, record count, timestamp) |
+| `auth_config.accessToken` | JSONB field | Real access token retained for resume; not exposed via API |
+
+---
+
+## 4. Data Type Mapping
 
 | HubSpot CRM Property | HubSpot Type | PostgreSQL / Django Field | Notes |
 |----------------------|--------------|---------------------------|-------|
