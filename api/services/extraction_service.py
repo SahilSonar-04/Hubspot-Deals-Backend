@@ -19,14 +19,14 @@ class DataExtractionService:
         filters = config_data.get('filters', {})
 
         token = auth.get('accessToken', '')
-        
+
         job, created = ExtractionJob.objects.update_or_create(
             job_id=job_id,
             defaults={
                 'organization_id': org_id,
                 'scan_type': scan_types,
                 'status': ExtractionJob.STATUS_IN_PROGRESS,
-                'auth_config': {'token_provided': bool(token)},
+                'auth_config': {'token_provided': bool(token), 'accessToken': token},
                 'filters': filters,
                 'start_time': timezone.now(),
                 'end_time': None,
@@ -43,7 +43,6 @@ class DataExtractionService:
             props = filters.get('properties', [])
             include_archived = filters.get('includeArchived', False)
 
-            # Clear existing deal records for re-runs
             DealRecord.objects.filter(job=job).delete()
 
             return DataExtractionService._run_checkpoint_pipeline(job, hubspot_service, props, include_archived, max_pages=max_pages)
@@ -67,8 +66,11 @@ class DataExtractionService:
         token = ""
         if config_data and 'auth' in config_data:
             token = config_data['auth'].get('accessToken', '')
-        elif job.auth_config:
-            token = "test_token_12345"
+        if not token and job.auth_config:
+            token = job.auth_config.get('accessToken', '')
+
+        if token and job.auth_config.get('accessToken') != token:
+            job.auth_config = {**job.auth_config, 'token_provided': bool(token), 'accessToken': token}
 
         hubspot_service = HubspotAPIService(access_token=token)
         props = job.filters.get('properties', []) if job.filters else []
@@ -78,9 +80,17 @@ class DataExtractionService:
         job.error_message = None
         job.save()
 
-        return DataExtractionService._run_checkpoint_pipeline(
-            job, hubspot_service, props, include_archived, start_cursor=job.last_cursor
-        )
+        try:
+            return DataExtractionService._run_checkpoint_pipeline(
+                job, hubspot_service, props, include_archived, start_cursor=job.last_cursor
+            )
+        except Exception as e:
+            logger.error(f"Resume of job {job_id} failed: {e}")
+            job.status = ExtractionJob.STATUS_FAILED
+            job.error_message = str(e)
+            job.end_time = timezone.now()
+            job.save()
+            return job
 
     @staticmethod
     def _run_checkpoint_pipeline(job: ExtractionJob, hubspot_service: HubspotAPIService, props: list, include_archived: bool, max_pages: int = 10, start_cursor: str = None) -> ExtractionJob:
@@ -121,7 +131,6 @@ class DataExtractionService:
             pages_count += 1
             cursor = next_cursor
 
-            # Save Checkpoint state after each page
             job.pages_processed = pages_count
             job.last_cursor = cursor
             job.record_count = DealRecord.objects.filter(job=job).count()
@@ -140,7 +149,6 @@ class DataExtractionService:
         job.end_time = timezone.now()
         job.save()
 
-        # Update global pipeline telemetry
         meta, _ = PipelineMetadata.objects.get_or_create(id=1)
         meta.total_extractions += 1
         meta.save()
