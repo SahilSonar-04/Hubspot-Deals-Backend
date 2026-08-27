@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HubSpot Deals Analytics & Extraction Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-main: #f8fafc;
+            --card-bg: #ffffff;
+            --text-heading: #0f172a;
+            --text-body: #334155;
+            --text-muted: #64748b;
+            --brand-primary: #ff7a59; /* Official HubSpot Coral Accent */
+            --brand-secondary: #2563eb;
+            --accent-success: #10b981;
+            --accent-warning: #f59e0b;
+            --accent-danger: #ef4444;
+            --border-subtle: #e2e8f0;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-body);
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .navbar {
+            background-color: var(--card-bg);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .brand-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--brand-primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .navbar-brand h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-heading);
+            margin: 0;
+        }
+
+        .nav-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-heading);
+            background-color: #f1f5f9;
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            text-decoration: none;
+            transition: all 0.15s ease;
+        }
+
+        .nav-link:hover {
+            background-color: #e2e8f0;
+            border-color: #cbd5e1;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .page-header {
+            margin-bottom: 2rem;
+        }
+
+        .page-header p {
+            margin: 0.25rem 0 0 0;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .metric-card .label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-card .value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-heading);
+            line-height: 1.2;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .chart-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .chart-card h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-heading);
+            margin: 0 0 1.25rem 0;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+    </style>
+</head>
+<body>
+    <header class="navbar">
+        <div class="navbar-brand">
+            <div class="brand-icon">H</div>
+            <h1>HubSpot Deals Analytics</h1>
+        </div>
+        <div>
+            <a href="/docs/" class="nav-link">
+                <span>Swagger API Docs</span>
+                <span>→</span>
+            </a>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="page-header">
+            <p>Real-time Extraction Telemetry & Deal Pipeline Overview</p>
+        </div>
+
+        <section class="metrics-grid">
+            <article class="metric-card">
+                <div class="label">Extracted Deal Records</div>
+                <div class="value">{{ total_deals }}</div>
+            </article>
+            <article class="metric-card">
+                <div class="label">Total Pipeline Value</div>
+                <div class="value">{{ total_value }}</div>
+            </article>
+            <article class="metric-card">
+                <div class="label">Average Deal Size</div>
+                <div class="value">{{ avg_value }}</div>
+            </article>
+        </section>
+
+        <section class="charts-grid">
+            <article class="chart-card">
+                <h2>Deals Distribution by Stage</h2>
+                <div class="chart-container">
+                    <canvas id="stageChart"></canvas>
+                </div>
+            </article>
+            <article class="chart-card">
+                <h2>Extraction Jobs Status</h2>
+                <div class="chart-container">
+                    <canvas id="jobChart"></canvas>
+                </div>
+            </article>
+        </section>
+    </main>
+
+    <script>
+        const stageData = {{ stage_data|safe }};
+        const jobData = {{ job_data|safe }};
+
+        // Professional Enterprise Color Palette (Non-AI Theme)
+        const brandColors = ['#ff7a59', '#2563eb', '#10b981', '#f59e0b', '#64748b', '#0284c7'];
+
+        // Stage Chart
+        if (stageData && stageData.length > 0) {
+            const ctxStage = document.getElementById('stageChart').getContext('2d');
+            new Chart(ctxStage, {
+                type: 'bar',
+                data: {
+                    labels: stageData.map(d => d.stage),
+                    datasets: [{
+                        label: 'Deals Count',
+                        data: stageData.map(d => d.count),
+                        backgroundColor: '#ff7a59',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#f1f5f9' },
+                            ticks: { color: '#64748b', font: { family: 'Inter' } }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#64748b', font: { family: 'Inter' } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Job Status Chart
+        if (jobData && jobData.length > 0) {
+            const ctxJob = document.getElementById('jobChart').getContext('2d');
+            new Chart(ctxJob, {
+                type: 'doughnut',
+                data: {
+                    labels: jobData.map(j => j.status),
+                    datasets: [{
+                        data: jobData.map(j => j.count),
+                        backgroundColor: ['#10b981', '#2563eb', '#f59e0b', '#ef4444'],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: { color: '#334155', font: { family: 'Inter', size: 12 } }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
