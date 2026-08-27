@@ -2,6 +2,8 @@ from django.test import TestCase
 from rest_framework import status
 from api.models import ExtractionJob, DealRecord
 
+AUTH_HEADERS = {'HTTP_AUTHORIZATION': 'Bearer test_token_12345'}
+
 class CheckpointResumeTests(TestCase):
     """Test workflow for pagination checkpointing, pausing, and resuming extractions."""
 
@@ -19,22 +21,21 @@ class CheckpointResumeTests(TestCase):
             }
         }
 
-        # 1. Start job
-        response = self.client.post('/api/v1/scan/start', data=start_payload, content_type='application/json')
+        response = self.client.post(
+            '/api/v1/scan/start', data=start_payload, content_type='application/json', **AUTH_HEADERS
+        )
         self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
-        
+
         job = ExtractionJob.objects.get(job_id="checkpoint-job-001")
         self.assertEqual(job.status, ExtractionJob.STATUS_COMPLETED)
         self.assertGreater(job.pages_processed, 0)
         self.assertIsNotNone(job.checkpoint_data)
 
-        # 2. Pause job manually for testing
         job.status = ExtractionJob.STATUS_PAUSED
         job.last_cursor = "cursor_page_1"
         job.save()
 
-        # 3. Resume job
-        resume_response = self.client.post(f'/api/v1/scan/resume/{job.job_id}')
+        resume_response = self.client.post(f'/api/v1/scan/resume/{job.job_id}', **AUTH_HEADERS)
         self.assertEqual(resume_response.status_code, status.HTTP_200_OK)
 
         resumed_job = ExtractionJob.objects.get(job_id="checkpoint-job-001")

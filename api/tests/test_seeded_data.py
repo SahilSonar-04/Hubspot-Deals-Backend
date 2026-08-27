@@ -3,11 +3,12 @@ from django.urls import reverse
 from rest_framework import status
 from api.models import ExtractionJob, DealRecord, PipelineMetadata
 
+AUTH_HEADERS = {'HTTP_AUTHORIZATION': 'Bearer test_token_12345'}
+
 class SeededDataTests(TestCase):
     """Test workflow using pre-populated/seeded database records."""
 
     def setUp(self):
-        # 1. Seed completed job with records
         self.completed_job = ExtractionJob.objects.create(
             job_id="seeded-completed-job-001",
             organization_id="org-test-1",
@@ -30,7 +31,6 @@ class SeededDataTests(TestCase):
             stage="qualifiedtobuy"
         )
 
-        # 2. Seed pending job
         self.pending_job = ExtractionJob.objects.create(
             job_id="seeded-pending-job-002",
             organization_id="org-test-1",
@@ -46,7 +46,7 @@ class SeededDataTests(TestCase):
 
     def test_verify_job_status(self):
         """Verify job status endpoint for seeded job."""
-        response = self.client.get(f'/api/v1/scan/status/{self.completed_job.job_id}')
+        response = self.client.get(f'/api/v1/scan/status/{self.completed_job.job_id}', **AUTH_HEADERS)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.json()
         self.assertEqual(data['status'], 'completed')
@@ -54,7 +54,7 @@ class SeededDataTests(TestCase):
 
     def test_fetch_extraction_results(self):
         """Verify fetching extraction results for completed job."""
-        response = self.client.get(f'/api/v1/scan/result/{self.completed_job.job_id}')
+        response = self.client.get(f'/api/v1/scan/result/{self.completed_job.job_id}', **AUTH_HEADERS)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.json()
         self.assertEqual(data['total_records'], 2)
@@ -63,14 +63,14 @@ class SeededDataTests(TestCase):
 
     def test_list_all_jobs(self):
         """Verify listing all jobs endpoint."""
-        response = self.client.get('/api/v1/jobs/jobs')
+        response = self.client.get('/api/v1/jobs/jobs', **AUTH_HEADERS)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.json()
         self.assertEqual(data['total_jobs'], 2)
 
     def test_retrieve_job_statistics(self):
         """Verify retrieve job statistics endpoint."""
-        response = self.client.get('/api/v1/jobs/statistics')
+        response = self.client.get('/api/v1/jobs/statistics', **AUTH_HEADERS)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.json()
         self.assertEqual(data['total_jobs'], 2)
@@ -80,19 +80,17 @@ class SeededDataTests(TestCase):
 
     def test_cancel_pending_job(self):
         """Verify cancelling a pending job."""
-        response = self.client.post(f'/api/v1/scan/cancel/{self.pending_job.job_id}')
+        response = self.client.post(f'/api/v1/scan/cancel/{self.pending_job.job_id}', **AUTH_HEADERS)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()['status'], 'cancelled')
-        
-        # Subsequent status check
-        status_res = self.client.get(f'/api/v1/scan/status/{self.pending_job.job_id}')
+
+        status_res = self.client.get(f'/api/v1/scan/status/{self.pending_job.job_id}', **AUTH_HEADERS)
         self.assertEqual(status_res.json()['status'], 'cancelled')
 
     def test_remove_job_data(self):
         """Verify removing job data and subsequent 404 response."""
-        remove_res = self.client.delete(f'/api/v1/scan/remove/{self.completed_job.job_id}')
+        remove_res = self.client.delete(f'/api/v1/scan/remove/{self.completed_job.job_id}', **AUTH_HEADERS)
         self.assertEqual(remove_res.status_code, status.HTTP_200_OK)
 
-        # Check status after removal returns 404
-        status_res = self.client.get(f'/api/v1/scan/status/{self.completed_job.job_id}')
+        status_res = self.client.get(f'/api/v1/scan/status/{self.completed_job.job_id}', **AUTH_HEADERS)
         self.assertEqual(status_res.status_code, status.HTTP_404_NOT_FOUND)
