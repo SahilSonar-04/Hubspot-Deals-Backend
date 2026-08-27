@@ -6,26 +6,24 @@ README.md
 .env.example
 
 # Python
-__pycache__
+__pycache__/
 *.pyc
 *.pyo
 *.pyd
 .Python
-env
+env/
+venv/
+.venv/
 pip-log.txt
-pip-delete-this-directory.txt
-.tox
+.tox/
 .coverage
 .coverage.*
-.pytest_cache
+.pytest_cache/
 nosetests.xml
 coverage.xml
 *.cover
 *.log
-.git
-.mypy_cache
-.pytest_cache
-.hypothesis
+.mypy_cache/
 
 # OS
 .DS_Store
@@ -37,8 +35,8 @@ ehthumbs.db
 Thumbs.db
 
 # IDE
-.vscode
-.idea
+.vscode/
+.idea/
 *.swp
 *.swo
 
@@ -47,39 +45,21 @@ docs/
 *.md
 LICENSE
 
-# Testing
-tests/
+# Testing & Dev
+api/tests/
+**/tests/
+requirements-test.txt
+test-results/
 .pytest_cache/
 htmlcov/
 
-# Local development
-.env
-.env.local
-.env.development
-.env.test
-.env.production
-venv/
-.venv/
-node_modules/
-
-# DLT
-.dlt/
-*.duckdb
-*.duckdb.wal
+# Local database / storage
+*.sqlite3
+db.sqlite3
 
 # Logs
 logs/
 *.log
-
-# Temporary
-tmp/
-temp/
-.tmp/
-*.tmp
-
-# Backup files
-*.bak
-*.backup
 
 # Docker
 Dockerfile*
@@ -88,11 +68,3 @@ docker-compose*
 
 # CI/CD
 .github/
-.gitlab-ci.yml
-Jenkinsfile
-.travis.yml
-.circleci/
-
-# Example and usage files
-usage_example.py
-examples/
