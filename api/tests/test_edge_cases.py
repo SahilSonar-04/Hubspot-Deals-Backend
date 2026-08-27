@@ -41,6 +41,9 @@ class EdgeCaseTests(TestCase):
             '/api/v1/scan/start', data=payload, content_type='application/json', **AUTH_HEADERS
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        data = response.json()
+        self.assertIn('error', data)
+        self.assertEqual(data['status_code'], 400)
 
     def test_invalid_pagination_string_param(self):
         """Passing non-integer string in pagination params returns 400 Bad Request."""

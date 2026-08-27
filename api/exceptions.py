@@ -57,13 +57,24 @@ def custom_exception_handler(exc, context):
         data = response.data
         if isinstance(data, dict):
             if "detail" in data:
-                error_msg = data["detail"]
+                error_msg = str(data["detail"])
             elif "error" in data:
-                error_msg = data["error"]
+                error_msg = str(data["error"])
             else:
-                error_msg = data
+                # Format serializer field validation errors into a clean string summary
+                error_parts = []
+                for field, field_errs in data.items():
+                    err_str = ", ".join(field_errs) if isinstance(field_errs, list) else str(field_errs)
+                    error_parts.append(f"{field}: {err_str}")
+                error_msg = f"Validation error - {'; '.join(error_parts)}" if error_parts else "Invalid request payload."
+                response.data = {
+                    "error": error_msg,
+                    "details": data,
+                    "status_code": response.status_code
+                }
+                return response
         elif isinstance(data, list):
-            error_msg = data[0] if data else "An error occurred."
+            error_msg = str(data[0]) if data else "An error occurred."
         else:
             error_msg = str(data)
 

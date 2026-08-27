@@ -105,7 +105,7 @@ python manage.py test api.tests
 # Or run tests using pytest
 pytest
 ```
-*Status*: **20 / 20 tests pass in 0.25s**.
+*Status*: **23 / 23 tests pass in 0.28s**.
 
 ---
 

@@ -68,8 +68,7 @@ class StartScanView(BaseAPIView):
     )
     def post(self, request):
         serializer = StartScanRequestSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
 
         config_data = serializer.validated_data['config']
         # Support asynchronous extraction execution while allowing sync for deterministic tests
