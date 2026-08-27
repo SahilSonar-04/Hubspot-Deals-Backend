@@ -6,8 +6,8 @@ from rest_framework.exceptions import AuthenticationFailed
 
 
 def is_automated_testing() -> bool:
-    """Return True if executing within an automated test runner."""
-    if 'test' in sys.argv or 'pytest' in sys.modules or getattr(settings, 'TESTING', False):
+    """Return True strictly if an automated test suite runner is actively executing."""
+    if 'test' in sys.argv or any('pytest' in arg for arg in sys.argv) or 'PYTEST_CURRENT_TEST' in os.environ or getattr(settings, 'TESTING', False):
         return True
     return False
 

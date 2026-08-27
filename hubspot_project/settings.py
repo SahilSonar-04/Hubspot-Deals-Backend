@@ -11,14 +11,17 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
+import sys
+
+DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
 
 _DEFAULT_INSECURE_KEY = 'django-insecure-hubspot-deals-extraction-secret-key-2026'
 SECRET_KEY = os.environ.get('SECRET_KEY', _DEFAULT_INSECURE_KEY)
 
-if not DEBUG and SECRET_KEY == _DEFAULT_INSECURE_KEY:
+_is_testing = 'test' in sys.argv or any('pytest' in arg for arg in sys.argv) or 'PYTEST_CURRENT_TEST' in os.environ
+if not DEBUG and not _is_testing and SECRET_KEY == _DEFAULT_INSECURE_KEY:
     raise ImproperlyConfigured(
-        "SECRET_KEY must be set to a non-default value when DEBUG is False."
+        "SECRET_KEY must be set to a non-default value when DEBUG is False in production."
     )
 
 ALLOWED_HOSTS = [
