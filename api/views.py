@@ -182,8 +182,12 @@ class ScanResultView(BaseAPIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Cap limit to 100 to prevent unbounded memory queries
-        limit = min(limit, 100)
+        table_name = request.query_params.get('tableName', 'deal_records')
+        if table_name and table_name not in ('deal_records', 'deals'):
+            return Response(
+                {"error": f"Unsupported tableName '{table_name}'. Supported table is 'deal_records'."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         total_count = DealRecord.objects.filter(job=job).count()
         records_qs = DealRecord.objects.filter(job=job)[offset:offset + limit]

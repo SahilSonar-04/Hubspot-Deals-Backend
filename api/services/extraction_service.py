@@ -164,11 +164,16 @@ class DataExtractionService:
                 )
 
                 now_ts = timezone.now()
+                existing_deal_ids = set(DealRecord.objects.filter(job=job).values_list('deal_id', flat=True))
                 deal_records = []
                 for deal_item in deals_page:
+                    d_id = str(deal_item.get('deal_id'))
+                    if d_id in existing_deal_ids:
+                        continue
+                    existing_deal_ids.add(d_id)
                     record = DealRecord(
                         job=job,
-                        deal_id=str(deal_item.get('deal_id')),
+                        deal_id=d_id,
                         name=deal_item.get('name', ''),
                         amount=deal_item.get('amount'),
                         stage=deal_item.get('stage', 'qualifiedtobuy'),
