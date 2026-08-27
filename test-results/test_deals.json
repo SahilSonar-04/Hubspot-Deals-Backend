@@ -1,0 +1,37 @@
+[
+  {
+    "deal_id": "101",
+    "name": "Small Business Starter Package",
+    "amount": 5000.00,
+    "stage": "qualifiedtobuy",
+    "close_date": "2026-03-15T00:00:00Z"
+  },
+  {
+    "deal_id": "102",
+    "name": "Mid-Market Growth Retainer",
+    "amount": 25000.00,
+    "stage": "presentationscheduled",
+    "close_date": "2026-04-30T00:00:00Z"
+  },
+  {
+    "deal_id": "103",
+    "name": "Enterprise Software Platform",
+    "amount": 50000.00,
+    "stage": "closedwon",
+    "close_date": "2026-05-10T00:00:00Z"
+  },
+  {
+    "deal_id": "104",
+    "name": "Cloud Transformation Solution",
+    "amount": 75000.00,
+    "stage": "decisionmakerboughtin",
+    "close_date": "2026-06-01T00:00:00Z"
+  },
+  {
+    "deal_id": "105",
+    "name": "Legacy Audit & Security Compliance",
+    "amount": 100000.00,
+    "stage": "closedlost",
+    "close_date": "2026-02-28T00:00:00Z"
+  }
+]

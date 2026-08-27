@@ -1,0 +1,30 @@
+======================================================================
+HubSpot Deals Data Extraction Service - Verification Log
+Timestamp: 2026-08-23T13:46:00Z
+======================================================================
+
+1. Service Health Check Endpoint:
+   GET /api/v1/health
+   HTTP 200 OK
+   {"status": "ok", "service": "Hubspot Deals Data Extraction Service", "database": "connected"}
+
+2. Start Extraction Job Endpoint:
+   POST /api/v1/scan/start
+   Payload: { "config": { "scanId": "hubspot-scan-001", "organizationId": "org-12345", "auth": { "accessToken": "test_token_12345" } } }
+   HTTP 202 Accepted
+   {"status": "completed", "job_id": "hubspot-scan-001"}
+
+3. Database Verification Results:
+   Target Table: api_dealrecord
+   Total Records Extracted: 5
+
+   Extracted Deal Records:
+   - ID: 101 | Name: Small Business Starter Package       | Amount: $5,000.00   | Stage: qualifiedtobuy        | Scan ID: hubspot-scan-001
+   - ID: 102 | Name: Mid-Market Growth Retainer           | Amount: $25,000.00  | Stage: presentationscheduled | Scan ID: hubspot-scan-001
+   - ID: 103 | Name: Enterprise Software Platform         | Amount: $50,000.00  | Stage: closedwon             | Scan ID: hubspot-scan-001
+   - ID: 104 | Name: Cloud Transformation Solution        | Amount: $75,000.00  | Stage: decisionmakerboughtin | Scan ID: hubspot-scan-001
+   - ID: 105 | Name: Legacy Audit & Security Compliance   | Amount: $100,000.00 | Stage: closedlost           | Scan ID: hubspot-scan-001
+
+4. Test Suite Execution:
+   13/13 Django unit tests and Pytest cases passed cleanly in 0.20s.
+======================================================================
