@@ -1,14 +1,14 @@
-# Database Schema Design Documentation
+# Database Schema & Data Models Documentation
 
 ## Overview
-This document details the PostgreSQL / Django database schema design for storing extracted **HubSpot Deals** data, extraction jobs, and pipeline execution telemetry.
+This document specifies the relational database schema, indexing strategies, ETL metadata columns, encryption at rest, and HubSpot CRM property mappings for the **HubSpot Deals Data Extraction Service**.
 
 ---
 
 ## 1. Relational Schema Diagram & Models
 
 ### `api_extractionjob` Table
-Stores scan metadata, status lifecycle, and pagination checkpoint state.
+Stores scan metadata, status lifecycle, encrypted credentials, and pagination checkpoint state.
 
 ```sql
 CREATE TABLE api_extractionjob (
@@ -20,7 +20,7 @@ CREATE TABLE api_extractionjob (
     record_count INT NOT NULL DEFAULT 0,
     error_message TEXT,
     filters JSONB NOT NULL DEFAULT '{}'::jsonb,
-    auth_config JSONB NOT NULL DEFAULT '{}'::jsonb, -- stores token_provided flag and accessToken (plaintext, required for resume)
+    auth_config JSONB NOT NULL DEFAULT '{}'::jsonb, -- stores token_provided flag and encrypted accessToken
     start_time TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     end_time TIMESTAMPTZ,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -34,7 +34,7 @@ CREATE INDEX idx_extractionjob_org_id ON api_extractionjob(organization_id);
 CREATE INDEX idx_extractionjob_status ON api_extractionjob(status);
 ```
 
-`auth_config.accessToken` is stored so `/scan/resume/{job_id}` can continue extraction without the caller resupplying credentials. This is plaintext in the current implementation and is never returned by the API (`ExtractionJobSerializer` omits `auth_config`); a production deployment should move this to a proper secrets store.
+`auth_config.accessToken` is encrypted at rest using Fernet symmetric encryption (`api.services.token_encryption`) so `/scan/resume/{job_id}` can continue extraction securely without the caller resupplying credentials. It is never exposed in API responses (`ExtractionJobSerializer` omits raw credential payloads).
 
 ---
 
@@ -85,7 +85,7 @@ CREATE INDEX idx_dealrecord_scan ON api_dealrecord(_scan_id);
 | `last_cursor` | VARCHAR(255) | HubSpot pagination cursor to resume from |
 | `pages_processed` | INT | Number of pages fetched so far |
 | `checkpoint_data` | JSONB | Snapshot of checkpoint state (cursor, page count, record count, timestamp) |
-| `auth_config.accessToken` | JSONB field | Real access token retained for resume; not exposed via API |
+| `auth_config.accessToken` | JSONB field | Fernet-encrypted access token retained for resume; not exposed via API |
 
 ---
 

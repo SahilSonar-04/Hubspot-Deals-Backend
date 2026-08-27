@@ -57,6 +57,8 @@ class AuthenticatedServiceUser:
     def __init__(self, token: str):
         self.token = token
         self.username = "service_account"
+        self.pk = "service_account"
+        self.id = 1
         self.is_authenticated = True
         self.is_staff = False
         self.is_superuser = False
