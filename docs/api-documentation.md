@@ -131,6 +131,15 @@ The service supports two authentication methods for security compliance:
 - **Auth Required**: Yes
 - **Description**: Atomically halts an active asynchronous extraction job and saves checkpoint.
 - **Response**: `200 OK`
+```json
+{
+  "job_id": "hubspot-scan-001",
+  "status": "paused",
+  "record_count": 2,
+  "pages_processed": 1,
+  "last_cursor": "cursor_page_1"
+}
+```
 
 ---
 
@@ -139,14 +148,28 @@ The service supports two authentication methods for security compliance:
 - **Auth Required**: Yes
 - **Description**: Continues extraction starting from `last_cursor` without duplicating stored records.
 - **Response**: `200 OK`
+```json
+{
+  "job_id": "hubspot-scan-001",
+  "status": "in_progress",
+  "pages_processed": 1,
+  "last_cursor": "cursor_page_1"
+}
+```
 
 ---
 
 ### 3.7. Cancel Scan Job
 - **Endpoint**: `POST /api/v1/scan/cancel/<job_id>`
 - **Auth Required**: Yes
-- **Description**: Cancels pending or running extraction job. Returns `400 Bad Request` if already completed.
+- **Description**: Cancels pending or running extraction job.
 - **Response**: `200 OK`
+```json
+{
+  "job_id": "hubspot-scan-001",
+  "status": "cancelled"
+}
+```
 
 ---
 
@@ -155,6 +178,11 @@ The service supports two authentication methods for security compliance:
 - **Auth Required**: Yes
 - **Description**: Deletes all stored deals and metadata for the job.
 - **Response**: `200 OK`
+```json
+{
+  "message": "Data for scan job 'hubspot-scan-001' removed successfully."
+}
+```
 
 ---
 
@@ -163,13 +191,41 @@ The service supports two authentication methods for security compliance:
 - **Auth Required**: Yes
 - **Query Params**: `limit`, `offset`, `status`
 - **Response**: `200 OK`
+```json
+{
+  "total": 1,
+  "limit": 10,
+  "offset": 0,
+  "next_offset": null,
+  "prev_offset": null,
+  "has_more": false,
+  "jobs": [
+    {
+      "job_id": "hubspot-scan-001",
+      "status": "completed",
+      "record_count": 5
+    }
+  ]
+}
+```
 
 ---
 
 ### 3.10. Job Statistics
 - **Endpoint**: `GET /api/v1/jobs/statistics`
 - **Auth Required**: Yes
-- **Response**: `200 OK` (Summary counts and dynamically calculated extraction durations)
+- **Response**: `200 OK`
+```json
+{
+  "total_jobs": 1,
+  "completed_jobs": 1,
+  "pending_jobs": 0,
+  "failed_jobs": 0,
+  "cancelled_jobs": 0,
+  "total_records_extracted": 5,
+  "average_extraction_time_seconds": 4.5
+}
+```
 
 ---
 
@@ -183,3 +239,27 @@ The service supports two authentication methods for security compliance:
 ### 3.12. Analytics Dashboard & Data
 - **Dashboard UI**: `GET /api/v1/visualizations/dashboard` (HTML UI, Auth Required)
 - **Dashboard JSON Data**: `GET /api/v1/visualizations/data` (JSON analytics, Auth Required)
+
+---
+
+## 4. Error Responses & HTTP Status Codes
+
+All service error responses conform strictly to the centralized JSON error envelope:
+```json
+{
+  "error": "<Human-readable error description>",
+  "status_code": <HTTP_STATUS_CODE>,
+  "details": {}
+}
+```
+
+### HTTP Status Code Reference
+
+| Status Code | Description | Typical Cause | Example Response Payload |
+|---|---|---|---|
+| **`400 Bad Request`** | Invalid input or state | Missing required fields, invalid pagination params, or cancelling completed job | `{"error": "Validation error - config.auth: This field is required.", "status_code": 400}` |
+| **`401 Unauthorized`** | Authentication required | Missing or invalid `X-API-Key` or `Authorization: Bearer` header | `{"error": "Authentication credentials were not provided.", "status_code": 401}` |
+| **`404 Not Found`** | Resource missing | Querying non-existent `job_id` | `{"error": "Extraction job with ID 'non-existent-id' not found.", "status_code": 404}` |
+| **`429 Too Many Requests`** | Rate limit exceeded | Request burst exceeding throttle rate | `{"error": "Request was throttled. Expected available in 60 seconds.", "status_code": 429}` |
+| **`500 Internal Server Error`** | Server error | Unexpected unhandled server exception | `{"error": "An internal server error occurred.", "status_code": 500}` |
+| **`503 Service Unavailable`** | Upstream API error | HubSpot CRM API unreachable or rate limit exhaustion | `{"error": "HubSpot API request failed: Service Unavailable", "status_code": 503}` |

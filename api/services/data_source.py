@@ -117,3 +117,38 @@ class DealsDataSource:
                 "has_more": has_more,
                 "page_number": pages_count,
             }
+
+
+# DLT Integration Resource Definition
+try:
+    import dlt
+
+    @dlt.resource(name="hubspot_deals", write_disposition="merge", primary_key="deal_id")
+    def hubspot_deals_resource(
+        access_token: Optional[str] = None,
+        properties: Optional[List[str]] = None,
+        scan_id: str = "default_scan",
+        tenant_id: str = "default_tenant"
+    ) -> Generator[Dict[str, Any], None, None]:
+        """DLT Resource yielding transformed HubSpot deal records."""
+        api = HubspotAPIService(access_token=access_token)
+        cursor = None
+        has_more = True
+        while has_more:
+            raw_deals, cursor, has_more = api.fetch_deals_page(properties=properties, after_cursor=cursor)
+            for d in raw_deals:
+                yield transform_deal_record(d, scan_id=scan_id, tenant_id=tenant_id)
+
+    @dlt.source(name="hubspot_deals_source")
+    def hubspot_deals_source(
+        access_token: Optional[str] = None,
+        properties: Optional[List[str]] = None,
+        scan_id: str = "default_scan",
+        tenant_id: str = "default_tenant"
+    ):
+        """DLT Source wrapper for HubSpot Deals."""
+        return [hubspot_deals_resource(access_token, properties, scan_id, tenant_id)]
+
+except ImportError:
+    hubspot_deals_resource = None
+    hubspot_deals_source = None

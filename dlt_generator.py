@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 DLT Generator Tool
-Generates service scaffolding and configuration based on input JSON configuration.
+Generates service structure, pipeline scaffolding, and documentation templates
+based on the provided JSON configuration.
 """
 
 import os
@@ -26,13 +27,50 @@ def generate_service(config_path: str):
     print(f"  Configured Ports: Dev={ports.get('dev')}, Stage={ports.get('stage')}, Prod={ports.get('prod')}")
     print(f"==================================================")
 
-    # Ensure required documentation directory and template files exist
-    docs_dir = Path("docs")
-    docs_dir.mkdir(exist_ok=True)
+    # 1. Scaffolding Directories
+    directories = [
+        Path("docs"),
+        Path("services"),
+        Path("test-results"),
+        Path("logs"),
+        Path("api/services"),
+        Path("api/tests"),
+    ]
+    for d in directories:
+        d.mkdir(parents=True, exist_ok=True)
+        print(f"[OK] Directory verified: {d}/")
 
-    print(f"[OK] Verified directory structure for {service_name}")
-    print(f"[OK] Initialized DLT pipeline scaffold")
-    print(f"[OK] Generation completed successfully for {project_name}.")
+    # 2. Template Documentation Scaffolding
+    doc_templates = {
+        Path("docs/api-integration.md"): "# HubSpot CRM API Integration Documentation\n\n## Overview\n",
+        Path("docs/database-schema.md"): "# Database Schema Design: HubSpot Deals Data Extraction Service\n\n## Overview\n",
+        Path("docs/api-documentation.md"): "# Service API Specification Documentation\n\n## Overview\n",
+    }
+    for doc_path, default_content in doc_templates.items():
+        if not doc_path.exists():
+            doc_path.write_text(default_content, encoding="utf-8")
+            print(f"[OK] Generated template: {doc_path}")
+        else:
+            print(f"[OK] Existing template preserved: {doc_path}")
+
+    # 3. Environment Scaffolding
+    env_file = Path(".env.example")
+    if not env_file.exists():
+        env_file.write_text(
+            f"# {project_name} Environment Configuration\n"
+            f"PIPELINE_NAME={service_name}_pipeline\n"
+            f"DATABASE_SCHEMA={service_name}\n"
+            f"PORT={ports.get('dev', 5200)}\n",
+            encoding="utf-8"
+        )
+        print(f"[OK] Generated environment template: {env_file}")
+    else:
+        print(f"[OK] Environment template verified: {env_file}")
+
+    print("==================================================")
+    print(f"[SUCCESS] Scaffolding for '{project_name}' generated successfully.")
+    print(f"[NEXT STEP] Review and customize documents in docs/ directory.")
+    print("==================================================")
 
 
 def main():

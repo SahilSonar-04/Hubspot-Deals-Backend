@@ -14,7 +14,7 @@ This document details the integration between the **HubSpot Deals Data Extractio
 ---
 
 ## 2. Target Endpoint & Method
-- **Base URL**: `https://api.hubapi.com`
+- **Base URL**: `https://api.hubapi.com` (configurable via `HUBSPOT_DEALS_API_BASE_URL`)
 - **Endpoint**: `/crm/v3/objects/deals`
 - **HTTP Method**: `GET`
 
@@ -31,8 +31,9 @@ This document details the integration between the **HubSpot Deals Data Extractio
 
 ---
 
-## 4. HubSpot Deal Properties Reference
+## 4. Comprehensive HubSpot Deal Properties Reference
 
+### 4.1. Core Deal Properties
 | Property Name | Data Type | Description |
 |---------------|-----------|-------------|
 | `dealname` | String | Name of the deal opportunity |
@@ -43,8 +44,35 @@ This document details the integration between the **HubSpot Deals Data Extractio
 | `createdate` | ISO-8601 Timestamp | Record creation timestamp in HubSpot CRM |
 | `hs_lastmodifieddate` | ISO-8601 Timestamp | Timestamp when the deal was last updated |
 | `hubspot_owner_id` | String | Identifier of the CRM deal owner |
-| `description` | String | Detailed description/notes of the deal |
-| `dealtype` | String | Deal classification (e.g., `newbusiness`, `existingbusiness`) |
+| `description` | String | Detailed description and notes about the opportunity |
+| `dealtype` | String | Classification of deal (`newbusiness`, `existingbusiness`) |
+
+### 4.2. Forecasting & Stage Probability
+| Property Name | Data Type | Description |
+|---------------|-----------|-------------|
+| `hs_deal_stage_probability` | Number | Probability percentage of winning the deal based on stage |
+| `hs_forecast_amount` | Number/Decimal | Forecasted weighted revenue contribution |
+| `hs_is_closed` | Boolean | Whether the deal has reached a closed stage |
+| `hs_is_closed_won` | Boolean | Flag indicating if the deal was successfully closed won |
+| `hs_is_closed_lost` | Boolean | Flag indicating if the deal was marked as closed lost |
+| `hs_days_to_close_raw` | Integer | Number of days elapsed between creation and close date |
+| `hs_projected_amount` | Number/Decimal | Projected revenue amount calculated across sales cycles |
+
+### 4.3. Financial & Revenue Properties
+| Property Name | Data Type | Description |
+|---------------|-----------|-------------|
+| `hs_acv` | Number/Decimal | Annual Contract Value |
+| `hs_arr` | Number/Decimal | Annual Recurring Revenue |
+| `hs_mrr` | Number/Decimal | Monthly Recurring Revenue |
+| `hs_tcv` | Number/Decimal | Total Contract Value |
+
+### 4.4. Association & Activity Metadata
+| Property Name | Data Type | Description |
+|---------------|-----------|-------------|
+| `num_associated_contacts` | Integer | Count of contacts associated with this deal |
+| `num_notes` | Integer | Total number of notes logged against the deal |
+| `num_contacted_notes` | Integer | Count of outreach notes |
+| `hs_analytics_source` | String | Original marketing channel/source of the deal |
 
 ---
 
