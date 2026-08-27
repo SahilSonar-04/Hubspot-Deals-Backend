@@ -276,6 +276,9 @@ class DataExtractionService:
                 job.status = ExtractionJob.STATUS_CANCELLED
                 job.end_time = timezone.now()
                 job.save(update_fields=['status', 'end_time', 'updated_at'])
+            elif job.status == ExtractionJob.STATUS_COMPLETED:
+                from api.exceptions import ServiceError
+                raise ServiceError(f"Cannot cancel job '{job_id}' because it has already completed.", status_code=400)
         return job
 
     @staticmethod

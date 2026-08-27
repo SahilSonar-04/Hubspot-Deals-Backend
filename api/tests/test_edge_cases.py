@@ -62,3 +62,14 @@ class EdgeCaseTests(TestCase):
         response = self.client.get('/api/v1/metrics')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('hubspot_extractions_total', response.content.decode('utf-8'))
+
+    def test_cancel_already_completed_job_returns_400(self):
+        """Attempting to cancel an already completed job returns 400 Bad Request."""
+        from api.models import ExtractionJob
+        job = ExtractionJob.objects.create(
+            job_id="edge-completed-job-123",
+            status=ExtractionJob.STATUS_COMPLETED
+        )
+        response = self.client.post(f'/api/v1/scan/cancel/{job.job_id}', **AUTH_HEADERS)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('error', response.json())
